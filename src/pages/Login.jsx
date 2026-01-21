@@ -44,7 +44,7 @@ export default function Login() {
               <Zap className="logo-icon" size={64} />
             </div>
             <h1 className="game-title neon-text">HIGHWAY HUSTLE</h1>
-            <p className="game-subtitle">EVERY MILE MATTERS</p>
+            <p className="game-subtitle">Kult Games</p>
           </motion.div>
 
           {/* Connection Card */}
@@ -136,7 +136,7 @@ export default function Login() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.8, duration: 0.6 }}
           >
-            <p className="copyright">© 2025 FrameX Corporation • Built on Blockchain</p>
+            <p className="copyright">© 2025 Kult Games</p>
           </motion.div>
         </motion.div>
       </div>
