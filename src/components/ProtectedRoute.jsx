@@ -4,7 +4,17 @@ import { isSessionActive } from '../lib/authSession';
 
 export default function ProtectedRoute({ children }) {
   const hasSession = isSessionActive();
-  console.log('[ProtectedRoute] Checking authentication:', { hasSession });
+  const hasToken = typeof window !== 'undefined' ? !!localStorage.getItem('token') : false;
+  const hasPrivySession =
+    typeof window !== 'undefined' ? !!localStorage.getItem('privySession') : false;
+  const hasPrivyUser =
+    typeof window !== 'undefined' ? !!localStorage.getItem('privyUser') : false;
+  console.log('[ProtectedRoute] Checking authentication:', {
+    hasSession,
+    hasToken,
+    hasPrivySession,
+    hasPrivyUser,
+  });
 
   if (!hasSession) {
     console.log('[ProtectedRoute] No session found, redirecting to login');

@@ -666,9 +666,9 @@ function LoginModal({ open, onClose, logoSrc }) {
   const [gateConnecting, setGateConnecting] = useState(false);
 
   // Get user info from Privy
-  const { user, isReady } = usePrivy();
+  const { user, ready } = usePrivy();
   
-  console.log('[LoginModal] Privy initialized:', { isReady, user: user?.id });
+  console.log('[LoginModal] Privy initialized:', { ready, user: user?.id });
 
   useEffect(() => {
     const linkedAccounts = Array.isArray(user?.linkedAccounts)
@@ -678,7 +678,7 @@ function LoginModal({ open, onClose, logoSrc }) {
       : [];
 
     console.log('[LoginModal] Privy state update', {
-      isReady,
+      ready,
       userId: user?.id || 'none',
       hasWallet: !!user?.wallet?.address,
       walletAddress: summarizeAddress(user?.wallet?.address),
@@ -700,7 +700,7 @@ function LoginModal({ open, onClose, logoSrc }) {
       walletAddresses: connectionAddresses.map(summarizeAddress),
       error: connections.error || null,
     });
-  }, [isReady, user]);
+  }, [ready, user]);
 
   const persistAuthSession = ({ source, loginType, wallet, walletAddress }) => {
     const connections = getPrivyConnectionsSnapshot();
@@ -756,6 +756,15 @@ function LoginModal({ open, onClose, logoSrc }) {
       privyUserId: resolvedUserId,
     };
 
+    console.log('[LoginModal] Resolved session fields', {
+      resolvedWalletAddress: summarizeAddress(resolvedWalletAddress),
+      resolvedEmail: resolvedEmail || 'none',
+      resolvedDiscord: resolvedDiscord || 'none',
+      resolvedLoginType,
+      resolvedUserId: resolvedUserId || 'none',
+      connectionKey: connections.key || 'none',
+    });
+
     const userSnapshot = safeSerialize(user);
     const sessionPayload = {
       session,
@@ -763,7 +772,11 @@ function LoginModal({ open, onClose, logoSrc }) {
     };
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem('privyMetaData', JSON.stringify(privyMetaData));
+      try {
+        localStorage.setItem('privyMetaData', JSON.stringify(privyMetaData));
+      } catch (err) {
+        console.error('[LoginModal] Failed to store privyMetaData', err);
+      }
     }
 
     console.log('[LoginModal] Persisting auth session', {
@@ -803,7 +816,7 @@ function LoginModal({ open, onClose, logoSrc }) {
   }, [user]);
 
   useEffect(() => {
-    if (!isReady || !user || typeof window === 'undefined') return;
+    if (!ready || !user || typeof window === 'undefined') return;
     let attempts = 0;
     let lastRaw = null;
     const maxAttempts = 8;
@@ -852,7 +865,7 @@ function LoginModal({ open, onClose, logoSrc }) {
     }, 500);
 
     return () => clearInterval(interval);
-  }, [isReady, user]);
+  }, [ready, user]);
 
   const handleLoginSuccess = async (loginData) => {
     try {
@@ -864,18 +877,25 @@ function LoginModal({ open, onClose, logoSrc }) {
       console.log('[LoginModal] Login success, checking localStorage');
       const session = getAuthSession();
       const userSnapshot = getAuthUser();
-      const privyMetaData = localStorage.getItem('privyMetaData');
+      const privyMetaDataRaw = localStorage.getItem('privyMetaData');
+      const privyMetaData = safeParseJson(privyMetaDataRaw);
+      const sessionRaw = localStorage.getItem('privySession');
+      const userRaw = localStorage.getItem('privyUser');
+      const sessionActive = isSessionActive();
       
       console.log('[LoginModal] Login data stored in localStorage:', {
         hasSession: !!session,
         session,
+        sessionRawLength: sessionRaw ? sessionRaw.length : 0,
+        userRawLength: userRaw ? userRaw.length : 0,
+        sessionActive,
         hasUserSnapshot: !!userSnapshot,
         privyUserId: userSnapshot?.id || session?.userId || 'none',
-        privyMetaData: privyMetaData ? JSON.parse(privyMetaData) : 'none',
+        privyMetaData: privyMetaData || privyMetaDataRaw || 'none',
         timestamp: new Date().toISOString(),
       });
 
-      if (isSessionActive()) {
+      if (sessionActive) {
         console.log('[LoginModal] Session verified, closing modal and navigating');
         if (dialogRef.current?.open) {
           dialogRef.current.close();
@@ -900,16 +920,29 @@ function LoginModal({ open, onClose, logoSrc }) {
   const { connectWallet } = useConnectWallet({
     onSuccess: async (wallet) => {
       console.log('[LoginModal] ✅ connectWallet onSuccess fired with wallet:', wallet);
-      const address = wallet?.address;
+      const resolvedWallet = wallet?.wallet || wallet;
+      const address = resolvedWallet?.address;
       if (!address) {
-        console.warn('[LoginModal] Wallet connect succeeded but no address found');
+        console.warn('[LoginModal] Wallet connect succeeded but no address found', {
+          hasNestedWallet: !!wallet?.wallet,
+          walletKeys: wallet && typeof wallet === 'object' ? Object.keys(wallet) : [],
+          nestedWalletKeys:
+            resolvedWallet && typeof resolvedWallet === 'object'
+              ? Object.keys(resolvedWallet)
+              : [],
+        });
         setError('Connected wallet has no address. Please try again.');
         return;
       }
       try {
-        const walletType = wallet?.walletClientType || 'unknown';
+        const walletType =
+          resolvedWallet?.walletClientType ||
+          resolvedWallet?.connectorType ||
+          wallet?.walletClientType ||
+          wallet?.connectorType ||
+          'unknown';
         console.log('[LoginModal] Privy user snapshot during wallet login', {
-          isReady,
+          ready,
           userId: user?.id || 'none',
           hasEmail: !!user?.email?.address,
         });
@@ -922,7 +955,16 @@ function LoginModal({ open, onClose, logoSrc }) {
         const session = persistAuthSession({
           source: 'wallet',
           loginType: walletType,
-          wallet,
+          wallet: resolvedWallet,
+        });
+
+        console.log('[LoginModal] Wallet session persistence check', {
+          hasSession: !!session,
+          sessionActive: isSessionActive(),
+          sessionRawLength:
+            typeof window !== 'undefined' && localStorage.getItem('privySession')
+              ? localStorage.getItem('privySession').length
+              : 0,
         });
 
         if (session) {
@@ -958,7 +1000,7 @@ function LoginModal({ open, onClose, logoSrc }) {
           });
         }
         console.log('[LoginModal] OAuth onComplete user snapshot', {
-          isReady,
+          ready,
           userId: user?.id || 'none',
           hasWallet: !!user?.wallet?.address,
           walletAddress: summarizeAddress(user?.wallet?.address),
@@ -996,7 +1038,7 @@ function LoginModal({ open, onClose, logoSrc }) {
       // After email login completes, save the Privy session details locally
       try {
         console.log('[LoginModal] Email onComplete user snapshot', {
-          isReady,
+          ready,
           userId: user?.id || 'none',
           hasWallet: !!user?.wallet?.address,
           walletAddress: summarizeAddress(user?.wallet?.address),
@@ -1076,13 +1118,13 @@ function LoginModal({ open, onClose, logoSrc }) {
       window.location.hash.includes('privy_oauth_code');
     if (!isOAuthCallback) return;
     console.log('[LoginModal] OAuth callback detected while modal open', {
-      isReady,
+      ready,
       hasUser: !!user,
       userId: user?.id || 'none',
       hasWallet: !!user?.wallet?.address,
       hasEmail: !!user?.email?.address,
     });
-  }, [isReady, user]);
+  }, [ready, user]);
 
   useEffect(() => {
     console.log('[LoginModal] Gate wallet connecting state', { gateConnecting });
@@ -1091,7 +1133,7 @@ function LoginModal({ open, onClose, logoSrc }) {
   const handleConnectWallet = () => {
     console.log('[LoginModal] 🔌 Connect wallet button clicked');
     console.log('[LoginModal] Connect wallet preflight', {
-      isReady,
+      ready,
       hasUser: !!user,
       userId: user?.id || 'none',
       hasWindowEthereum: typeof window !== 'undefined' && !!window.ethereum,
