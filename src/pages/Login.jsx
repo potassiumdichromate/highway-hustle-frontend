@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Zap } from 'lucide-react';
@@ -9,6 +10,7 @@ import './Login.css';
 
 export default function Login() {
   const navigate = useNavigate();
+  const { authenticated, ready, user } = usePrivy();
   const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
@@ -34,6 +36,42 @@ export default function Login() {
 
     return undefined;
   }, [navigate]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isOAuthCallback =
+      window.location.search.includes('privy_oauth_state') ||
+      window.location.hash.includes('privy_oauth_state') ||
+      window.location.search.includes('privy_oauth_code') ||
+      window.location.hash.includes('privy_oauth_code');
+    const connections =
+      localStorage.getItem('privy:connections') ||
+      localStorage.getItem('privy:connection') ||
+      '';
+
+    console.log('[Login] Privy state snapshot', {
+      ready,
+      authenticated,
+      hasUser: !!user,
+      userId: user?.id || 'none',
+      hasWallet: !!user?.wallet?.address,
+      walletAddress: user?.wallet?.address || 'none',
+      hasEmail: !!user?.email?.address,
+      linkedAccountTypes: Array.isArray(user?.linkedAccounts)
+        ? user.linkedAccounts.map((account) => account?.type || account?.providerName)
+        : [],
+      isOAuthCallback,
+      url: window.location.href,
+      search: window.location.search,
+      hash: window.location.hash,
+      privyConnectionsKey: localStorage.getItem('privy:connections')
+        ? 'privy:connections'
+        : localStorage.getItem('privy:connection')
+        ? 'privy:connection'
+        : 'none',
+      privyConnectionsLength: connections.length,
+    });
+  }, [ready, authenticated, user]);
 
   const handleOpenLoginModal = () => {
     console.log('[Login] Opening login modal');
@@ -121,16 +159,14 @@ export default function Login() {
       </div>
 
       {/* Login Modal */}
-      {showLoginModal && (
-        <LoginModal 
-          open={showLoginModal}
-          onClose={() => {
-            console.log('[Login] Closing login modal');
-            setShowLoginModal(false);
-          }}
-          logoSrc=""
-        />
-      )}
+      <LoginModal 
+        open={showLoginModal}
+        onClose={() => {
+          console.log('[Login] Closing login modal');
+          setShowLoginModal(false);
+        }}
+        logoSrc=""
+      />
     </div>
   );
 }

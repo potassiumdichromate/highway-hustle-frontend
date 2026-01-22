@@ -950,6 +950,13 @@ function LoginModal({ open, onClose, logoSrc }) {
       // After OAuth completes, user info will be available in the Privy user hook
       // Save the Privy session details locally
       try {
+        if (typeof window !== 'undefined') {
+          console.log('[LoginModal] OAuth callback URL', {
+            href: window.location.href,
+            search: window.location.search,
+            hash: window.location.hash,
+          });
+        }
         console.log('[LoginModal] OAuth onComplete user snapshot', {
           isReady,
           userId: user?.id || 'none',
@@ -1061,11 +1068,41 @@ function LoginModal({ open, onClose, logoSrc }) {
   }, [oauthLoading]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isOAuthCallback =
+      window.location.search.includes('privy_oauth_state') ||
+      window.location.hash.includes('privy_oauth_state') ||
+      window.location.search.includes('privy_oauth_code') ||
+      window.location.hash.includes('privy_oauth_code');
+    if (!isOAuthCallback) return;
+    console.log('[LoginModal] OAuth callback detected while modal open', {
+      isReady,
+      hasUser: !!user,
+      userId: user?.id || 'none',
+      hasWallet: !!user?.wallet?.address,
+      hasEmail: !!user?.email?.address,
+    });
+  }, [isReady, user]);
+
+  useEffect(() => {
     console.log('[LoginModal] Gate wallet connecting state', { gateConnecting });
   }, [gateConnecting]);
 
   const handleConnectWallet = () => {
     console.log('[LoginModal] 🔌 Connect wallet button clicked');
+    console.log('[LoginModal] Connect wallet preflight', {
+      isReady,
+      hasUser: !!user,
+      userId: user?.id || 'none',
+      hasWindowEthereum: typeof window !== 'undefined' && !!window.ethereum,
+      privyConnectionsKey: typeof window !== 'undefined'
+        ? localStorage.getItem('privy:connections')
+          ? 'privy:connections'
+          : localStorage.getItem('privy:connection')
+          ? 'privy:connection'
+          : 'none'
+        : 'none',
+    });
     try {
       if (dialogRef.current?.open) {
         console.log('[LoginModal] Closing dialog');
@@ -1083,6 +1120,16 @@ function LoginModal({ open, onClose, logoSrc }) {
         console.log('[LoginModal] connectWallet function:', connectWallet);
         connectWallet();
         console.log('[LoginModal] connectWallet() called');
+        setTimeout(() => {
+          const connections = getPrivyConnectionsSnapshot();
+          const addresses = extractWalletAddresses(connections.parsed);
+          console.log('[LoginModal] Post-connect privy connections check', {
+            key: connections.key || 'none',
+            hasRaw: !!connections.raw,
+            walletAddresses: addresses.map(summarizeAddress),
+            error: connections.error || null,
+          });
+        }, 800);
       } catch (err) {
         console.error('[LoginModal] Error calling connectWallet:', err);
         setError('Failed to initiate wallet connection. Please try again.');
