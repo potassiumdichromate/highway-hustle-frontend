@@ -38,8 +38,22 @@ function AppContent() {
 }
 
 function App() {
+  console.log('[App] Initializing with Privy App ID:', import.meta.env.VITE_PRIVY_APP_ID);
+  
   return (
-    <PrivyProvider appId={import.meta.env.VITE_PRIVY_APP_ID || 'your-privy-app-id'}>
+    <PrivyProvider 
+      appId={import.meta.env.VITE_PRIVY_APP_ID}
+      config={{
+        wallets: {
+          injected: {
+            enabled: true,
+          },
+        },
+        embeddedWallets: {
+          createOnLogin: 'users-without-wallets',
+        },
+      }}
+    >
       <AppContent />
     </PrivyProvider>
   );

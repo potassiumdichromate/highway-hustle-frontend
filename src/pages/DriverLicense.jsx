@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { usePrivy } from '@privy-io/react-auth';
 import { useWallet } from '../context/WalletContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -22,6 +23,7 @@ import {
   Upload
 } from 'lucide-react';
 import SynthwaveBackground from '../components/SynthwaveBackground';
+import { logout as clearAuth } from '../api/auth';
 import './DriverLicense.css';
 
 // Mock data
@@ -71,6 +73,8 @@ const gameModesLeaderboard = {
 
 export default function DriverLicense() {
   const { account, disconnectWallet } = useWallet();
+  const { logout: privyLogout } = usePrivy();
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('overview');
   const [selectedGameMode, setSelectedGameMode] = useState('oneWay');
   const [chatMessages] = useState([
@@ -80,6 +84,24 @@ export default function DriverLicense() {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [garageOpen, setGarageOpen] = useState(false);
   const [gameModeSelectOpen, setGameModeSelectOpen] = useState(false);
+
+  const handleLogout = async () => {
+    console.log('[DriverLicense] Logout requested');
+    try {
+      if (privyLogout) {
+        await privyLogout();
+      }
+    } catch (err) {
+      console.warn('[DriverLicense] Privy logout failed', err);
+    }
+    try {
+      disconnectWallet();
+    } catch (err) {
+      console.warn('[DriverLicense] Wallet disconnect failed', err);
+    }
+    clearAuth();
+    navigate('/');
+  };
 
   const sections = [
     { id: 'overview', label: 'Overview', icon: <TrendingUp size={20} /> },
@@ -143,7 +165,7 @@ export default function DriverLicense() {
             <User size={18} />
             <span>{account?.slice(0, 6)}...{account?.slice(-4)}</span>
           </div>
-          <button className="icon-btn" onClick={disconnectWallet}>
+          <button className="icon-btn" onClick={handleLogout}>
             <LogOut size={20} />
           </button>
         </div>

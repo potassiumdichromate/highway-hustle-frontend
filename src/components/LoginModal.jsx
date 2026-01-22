@@ -3,13 +3,19 @@ import {
   useRef,
   useState,
 } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   useConnectWallet,
   useLoginWithEmail,
   useLoginWithOAuth,
   usePrivy,
 } from '@privy-io/react-auth';
-import { login as backendLogin } from '../api/auth';
+import {
+  getAuthSession,
+  getAuthUser,
+  isSessionActive,
+  setAuthSession,
+} from '../lib/authSession';
 import {
   connectGateWallet,
   getGateWalletCurrentNetwork,
@@ -137,6 +143,7 @@ const styles = {
     left: '50%',
     transform: 'translate(-50%, -50%)',
     margin: 0,
+    zIndex: 99999,
   },
   container: {
     position: 'relative',
@@ -389,7 +396,268 @@ function getNetworkLabel(network) {
   return network.name || network.chainId;
 }
 
+function summarizeAddress(address) {
+  if (!address || typeof address !== 'string') return 'none';
+  const trimmed = address.trim();
+  if (!trimmed) return 'none';
+  if (trimmed.length <= 10) return trimmed;
+  return `${trimmed.slice(0, 6)}...${trimmed.slice(-4)}`;
+}
+
+function safeSerialize(value) {
+  if (!value) return null;
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch (err) {
+    return null;
+  }
+}
+
+function safeParseJson(raw) {
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    return null;
+  }
+}
+
+function getPrivyConnectionsSnapshot() {
+  if (typeof window === 'undefined') {
+    return { raw: null, parsed: null, error: null, key: null };
+  }
+  const keys = ['privy:connections', 'privy:connection'];
+  let raw = null;
+  let key = null;
+  for (const candidate of keys) {
+    const value = localStorage.getItem(candidate);
+    if (value) {
+      raw = value;
+      key = candidate;
+      break;
+    }
+  }
+  if (!raw) return { raw: null, parsed: null, error: null, key: null };
+  try {
+    return { raw, parsed: JSON.parse(raw), error: null, key };
+  } catch (err) {
+    return { raw, parsed: null, error: err?.message || err, key };
+  }
+}
+
+function extractWalletAddresses(value) {
+  const results = new Set();
+  const visited = new Set();
+
+  const visit = (node) => {
+    if (!node) return;
+    if (typeof node === 'string') {
+      if (node.startsWith('0x') && node.length === 42) {
+        results.add(node);
+      }
+      return;
+    }
+    if (typeof node !== 'object') return;
+    if (visited.has(node)) return;
+    visited.add(node);
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+    Object.values(node).forEach(visit);
+  };
+
+  visit(value);
+  return Array.from(results);
+}
+
+function getCandidateProviderTag(candidate) {
+  if (!candidate || typeof candidate !== 'object') return '';
+  return [candidate.type, candidate.providerName, candidate.provider]
+    .filter(Boolean)
+    .join('|')
+    .toLowerCase();
+}
+
+function getCandidateAddress(candidate) {
+  if (!candidate || typeof candidate !== 'object') return '';
+  return (
+    candidate.address ||
+    candidate.walletAddress ||
+    candidate.publicAddress ||
+    candidate?.wallet?.address ||
+    ''
+  );
+}
+
+function getCandidateEmail(candidate) {
+  if (!candidate || typeof candidate !== 'object') return '';
+  return candidate.email || candidate.emailAddress || '';
+}
+
+function getCandidateIdentifier(candidate) {
+  if (!candidate || typeof candidate !== 'object') return '';
+  return (
+    getCandidateAddress(candidate) ||
+    getCandidateEmail(candidate) ||
+    candidate.username ||
+    candidate.subject ||
+    ''
+  );
+}
+
+function collectConnectionCandidates(value) {
+  const results = [];
+  const visited = new Set();
+
+  const visit = (node) => {
+    if (!node || typeof node !== 'object') return;
+    if (visited.has(node)) return;
+    visited.add(node);
+    if (Array.isArray(node)) {
+      node.forEach(visit);
+      return;
+    }
+
+    const hasSignal =
+      'type' in node ||
+      'providerName' in node ||
+      'provider' in node ||
+      'address' in node ||
+      'walletAddress' in node ||
+      'publicAddress' in node ||
+      'email' in node ||
+      'emailAddress' in node ||
+      'username' in node ||
+      'subject' in node;
+
+    if (hasSignal) {
+      results.push(node);
+    }
+
+    Object.values(node).forEach(visit);
+  };
+
+  visit(value);
+  return results;
+}
+
+function normalizeConnectionCandidates(candidates) {
+  if (!Array.isArray(candidates)) return [];
+  return candidates.map((candidate) => ({
+    type: candidate?.type || 'unknown',
+    providerName: candidate?.providerName || candidate?.provider || '',
+    identifier: getCandidateIdentifier(candidate),
+    verifiedAt: candidate?.verifiedAt || null,
+    address: getCandidateAddress(candidate),
+    email: getCandidateEmail(candidate),
+    walletClientType: candidate?.walletClientType || '',
+  }));
+}
+
+function resolveWalletAddressFromConnections(candidates) {
+  if (!Array.isArray(candidates)) return '';
+  const withAddress = candidates
+    .map((candidate) => ({
+      candidate,
+      address: getCandidateAddress(candidate),
+    }))
+    .filter((item) => Boolean(item.address));
+
+  if (!withAddress.length) return '';
+  const walletCandidate = withAddress.find((item) =>
+    getCandidateProviderTag(item.candidate).includes('wallet')
+  );
+  return walletCandidate?.address || withAddress[0].address;
+}
+
+function resolveEmailFromConnections(candidates) {
+  if (!Array.isArray(candidates)) return '';
+  const withEmail = candidates
+    .map((candidate) => ({
+      candidate,
+      email: getCandidateEmail(candidate),
+    }))
+    .filter((item) => Boolean(item.email));
+
+  if (!withEmail.length) return '';
+  const emailCandidate = withEmail.find((item) =>
+    getCandidateProviderTag(item.candidate).includes('email')
+  );
+  return emailCandidate?.email || withEmail[0].email;
+}
+
+function resolveDiscordFromConnections(candidates) {
+  if (!Array.isArray(candidates)) return '';
+  const discordCandidate = candidates.find((candidate) =>
+    getCandidateProviderTag(candidate).includes('discord')
+  );
+  return getCandidateIdentifier(discordCandidate) || '';
+}
+
+function resolveUserIdFromConnections(candidates) {
+  if (!Array.isArray(candidates)) return '';
+  const userIdCandidate = candidates.find(
+    (candidate) =>
+      candidate?.privyUserId ||
+      candidate?.userId ||
+      candidate?.user_id ||
+      candidate?.id
+  );
+  return (
+    userIdCandidate?.privyUserId ||
+    userIdCandidate?.userId ||
+    userIdCandidate?.user_id ||
+    userIdCandidate?.id ||
+    ''
+  );
+}
+
+function resolveLoginTypeFromConnections(candidates, fallback) {
+  if (!Array.isArray(candidates)) return fallback || 'unknown';
+  const tags = candidates.map(getCandidateProviderTag);
+
+  if (tags.some((tag) => tag.includes('discord'))) return 'discord';
+  if (tags.some((tag) => tag.includes('google'))) return 'google';
+  if (tags.some((tag) => tag.includes('email'))) return 'email';
+  if (tags.some((tag) => tag.includes('sms'))) return 'sms';
+  if (tags.some((tag) => tag.includes('wallet'))) return 'wallet';
+
+  return fallback || 'unknown';
+}
+
+function getLinkedAccountIdentifier(account) {
+  if (!account || typeof account !== 'object') return '';
+  return (
+    account.address ||
+    account.email ||
+    account.username ||
+    account.subject ||
+    ''
+  );
+}
+
+function normalizeLinkedAccounts(accounts) {
+  if (!Array.isArray(accounts)) return [];
+  return accounts.map((account) => ({
+    type: account?.type || 'unknown',
+    providerName: account?.providerName || '',
+    identifier: getLinkedAccountIdentifier(account),
+    verifiedAt: account?.verifiedAt || null,
+  }));
+}
+
+function getDiscordIdentifier(accounts) {
+  if (!Array.isArray(accounts)) return '';
+  const discordAccount = accounts.find(
+    (account) =>
+      account?.providerName === 'discord' || account?.type === 'discord_oauth'
+  );
+  return discordAccount ? getLinkedAccountIdentifier(discordAccount) : '';
+}
+
 function LoginModal({ open, onClose, logoSrc }) {
+  const navigate = useNavigate();
   const dialogRef = useRef(null);
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
@@ -398,11 +666,240 @@ function LoginModal({ open, onClose, logoSrc }) {
   const [gateConnecting, setGateConnecting] = useState(false);
 
   // Get user info from Privy
-  const { user } = usePrivy();
+  const { user, isReady } = usePrivy();
+  
+  console.log('[LoginModal] Privy initialized:', { isReady, user: user?.id });
+
+  useEffect(() => {
+    const linkedAccounts = Array.isArray(user?.linkedAccounts)
+      ? user.linkedAccounts
+          .map((account) => account?.providerName || account?.type)
+          .filter(Boolean)
+      : [];
+
+    console.log('[LoginModal] Privy state update', {
+      isReady,
+      userId: user?.id || 'none',
+      hasWallet: !!user?.wallet?.address,
+      walletAddress: summarizeAddress(user?.wallet?.address),
+      hasEmail: !!user?.email?.address,
+      linkedAccounts,
+    });
+
+    const connections = getPrivyConnectionsSnapshot();
+    const connectionAddresses = extractWalletAddresses(connections.parsed);
+    console.log('[LoginModal] privy:connections snapshot', {
+      hasRaw: !!connections.raw,
+      rawLength: connections.raw ? connections.raw.length : 0,
+      key: connections.key || 'none',
+      parsedType: connections.parsed ? typeof connections.parsed : 'none',
+      parsedKeys:
+        connections.parsed && typeof connections.parsed === 'object'
+          ? Object.keys(connections.parsed)
+          : [],
+      walletAddresses: connectionAddresses.map(summarizeAddress),
+      error: connections.error || null,
+    });
+  }, [isReady, user]);
+
+  const persistAuthSession = ({ source, loginType, wallet, walletAddress }) => {
+    const connections = getPrivyConnectionsSnapshot();
+    const connectionCandidates = collectConnectionCandidates(connections.parsed);
+    const normalizedConnections = normalizeConnectionCandidates(connectionCandidates);
+    const connectionWalletAddress = resolveWalletAddressFromConnections(connectionCandidates);
+    const connectionEmail = resolveEmailFromConnections(connectionCandidates);
+    const connectionDiscord = resolveDiscordFromConnections(connectionCandidates);
+    const connectionUserId = resolveUserIdFromConnections(connectionCandidates);
+    const resolvedWalletAddress =
+      walletAddress ||
+      connectionWalletAddress ||
+      wallet?.address ||
+      user?.wallet?.address ||
+      '';
+    const resolvedUserId = user?.id || connectionUserId || '';
+    const fallbackLoginType =
+      loginType || wallet?.walletClientType || user?.wallet?.walletClientType;
+    const resolvedLoginType = resolveLoginTypeFromConnections(
+      connectionCandidates,
+      fallbackLoginType
+    );
+    const resolvedEmail = connectionEmail || user?.email?.address || '';
+    const resolvedDiscord =
+      connectionDiscord || getDiscordIdentifier(user?.linkedAccounts);
+    const linkedAccounts = normalizedConnections.length
+      ? normalizedConnections
+      : normalizeLinkedAccounts(user?.linkedAccounts);
+
+    const session = {
+      source: source || 'privy',
+      loginType: resolvedLoginType,
+      userId: resolvedUserId,
+      email: resolvedEmail,
+      walletAddress: resolvedWalletAddress,
+      wallet: {
+        address: resolvedWalletAddress,
+        connectorType:
+          wallet?.connectorType || user?.wallet?.connectorType || '',
+        walletClientType:
+          wallet?.walletClientType || user?.wallet?.walletClientType || '',
+        chainId: wallet?.chainId || user?.wallet?.chainId || '',
+      },
+      linkedAccounts,
+      timestamp: new Date().toISOString(),
+    };
+
+    const privyMetaData = {
+      address: resolvedWalletAddress,
+      discord: resolvedDiscord,
+      email: resolvedEmail,
+      type: resolvedLoginType,
+      privyUserId: resolvedUserId,
+    };
+
+    const userSnapshot = safeSerialize(user);
+    const sessionPayload = {
+      session,
+      user: userSnapshot === null ? undefined : userSnapshot,
+    };
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('privyMetaData', JSON.stringify(privyMetaData));
+    }
+
+    console.log('[LoginModal] Persisting auth session', {
+      session,
+      hasUserSnapshot: !!userSnapshot,
+      userSnapshot,
+      privyMetaData,
+      privyConnections: {
+        hasRaw: !!connections.raw,
+        rawLength: connections.raw ? connections.raw.length : 0,
+        key: connections.key || 'none',
+        parsedType: connections.parsed ? typeof connections.parsed : 'none',
+        walletAddresses: extractWalletAddresses(connections.parsed).map(summarizeAddress),
+        candidates: normalizedConnections,
+        error: connections.error || null,
+      },
+    });
+
+    return setAuthSession(sessionPayload);
+  };
+
+  useEffect(() => {
+    if (!user) return;
+    const existingSession = getAuthSession();
+    if (!existingSession) {
+      console.log('[LoginModal] No session found; creating from Privy user');
+      persistAuthSession({ source: 'privy', loginType: 'privy' });
+      return;
+    }
+
+    console.log('[LoginModal] Refreshing session with latest Privy user data');
+    persistAuthSession({
+      source: existingSession.source || 'privy',
+      loginType: existingSession.loginType,
+      walletAddress: existingSession.walletAddress,
+    });
+  }, [user]);
+
+  useEffect(() => {
+    if (!isReady || !user || typeof window === 'undefined') return;
+    let attempts = 0;
+    let lastRaw = null;
+    const maxAttempts = 8;
+    const interval = setInterval(() => {
+      attempts += 1;
+      const connections = getPrivyConnectionsSnapshot();
+      if (!connections.raw) {
+        if (attempts >= maxAttempts) clearInterval(interval);
+        return;
+      }
+
+      if (connections.raw === lastRaw) {
+        if (attempts >= maxAttempts) clearInterval(interval);
+        return;
+      }
+      lastRaw = connections.raw;
+
+      const connectionCandidates = collectConnectionCandidates(connections.parsed);
+      const connectionWalletAddress = resolveWalletAddressFromConnections(connectionCandidates);
+      const connectionEmail = resolveEmailFromConnections(connectionCandidates);
+      const storedPrivyMetaData = safeParseJson(localStorage.getItem('privyMetaData'));
+
+      const needsUpdate =
+        (connectionWalletAddress &&
+          (!storedPrivyMetaData || !storedPrivyMetaData.address)) ||
+        (connectionEmail && (!storedPrivyMetaData || !storedPrivyMetaData.email));
+
+      console.log('[LoginModal] Checking privy:connections for metadata sync', {
+        key: connections.key || 'none',
+        walletAddress: summarizeAddress(connectionWalletAddress),
+        hasEmail: !!connectionEmail,
+        hasStoredMeta: !!storedPrivyMetaData,
+        storedAddress: summarizeAddress(storedPrivyMetaData?.address),
+        storedEmail: !!storedPrivyMetaData?.email,
+        needsUpdate,
+      });
+
+      if (needsUpdate) {
+        console.log('[LoginModal] Syncing privyMetaData from privy:connections');
+        persistAuthSession({ source: 'privy', loginType: 'privy' });
+        clearInterval(interval);
+        return;
+      }
+
+      if (attempts >= maxAttempts) clearInterval(interval);
+    }, 500);
+
+    return () => clearInterval(interval);
+  }, [isReady, user]);
+
+  const handleLoginSuccess = async (loginData) => {
+    try {
+      console.log('[LoginModal] handleLoginSuccess called', {
+        loginDataType: typeof loginData,
+        loginDataKeys:
+          loginData && typeof loginData === 'object' ? Object.keys(loginData) : [],
+      });
+      console.log('[LoginModal] Login success, checking localStorage');
+      const session = getAuthSession();
+      const userSnapshot = getAuthUser();
+      const privyMetaData = localStorage.getItem('privyMetaData');
+      
+      console.log('[LoginModal] Login data stored in localStorage:', {
+        hasSession: !!session,
+        session,
+        hasUserSnapshot: !!userSnapshot,
+        privyUserId: userSnapshot?.id || session?.userId || 'none',
+        privyMetaData: privyMetaData ? JSON.parse(privyMetaData) : 'none',
+        timestamp: new Date().toISOString(),
+      });
+
+      if (isSessionActive()) {
+        console.log('[LoginModal] Session verified, closing modal and navigating');
+        if (dialogRef.current?.open) {
+          dialogRef.current.close();
+        }
+        onClose?.();
+        
+        // Navigate to license page after a short delay to allow modal to close
+        setTimeout(() => {
+          console.log('[LoginModal] Navigating to /license');
+          navigate('/license');
+        }, 300);
+      } else {
+        console.error('[LoginModal] Login failed - no session in localStorage');
+        setError('Login failed - no session saved');
+      }
+    } catch (err) {
+      console.error('[LoginModal] Error in handleLoginSuccess:', err);
+      setError('An error occurred. Please try again.');
+    }
+  };
 
   const { connectWallet } = useConnectWallet({
     onSuccess: async (wallet) => {
-      console.log('[LoginModal] connectWallet success', wallet);
+      console.log('[LoginModal] ✅ connectWallet onSuccess fired with wallet:', wallet);
       const address = wallet?.address;
       if (!address) {
         console.warn('[LoginModal] Wallet connect succeeded but no address found');
@@ -411,31 +908,39 @@ function LoginModal({ open, onClose, logoSrc }) {
       }
       try {
         const walletType = wallet?.walletClientType || 'unknown';
+        console.log('[LoginModal] Privy user snapshot during wallet login', {
+          isReady,
+          userId: user?.id || 'none',
+          hasEmail: !!user?.email?.address,
+        });
 
-        console.log('[LoginModal] Calling backendLogin from wallet connect', {
+        console.log('[LoginModal] Saving wallet login session', {
           walletAddress: address,
           walletType,
         });
 
-        const res = await backendLogin({
-          privyMetaData: {
-            address: address,
-            discord: '',
-            email: user?.email?.address || '',
-            type: walletType,
-            privyUserId: user?.id || '',
-          },
+        const session = persistAuthSession({
+          source: 'wallet',
+          loginType: walletType,
+          wallet,
         });
-        console.log('[LoginModal] backendLogin result (wallet)', res);
+
+        if (session) {
+          console.log('[LoginModal] Wallet login session saved, handling success');
+          await handleLoginSuccess(session);
+        } else {
+          console.error('[LoginModal] Failed to save wallet login session');
+          setError('Login failed. Please try again.');
+        }
       } catch (err) {
-        console.error('[LoginModal] backendLogin failed from wallet connect', err);
+        console.error('[LoginModal] Wallet login failed from wallet connect', err);
         setError('Wallet login failed. Please try again.');
         return;
       }
       onClose?.();
     },
     onError: (err) => {
-      console.error('[LoginModal] connectWallet error', err);
+      console.error('[LoginModal] ❌ connectWallet onError fired:', err);
       setError(getErrorMessage(err, 'Failed to connect wallet'));
     },
   });
@@ -443,30 +948,36 @@ function LoginModal({ open, onClose, logoSrc }) {
   const { initOAuth, loading: oauthLoading } = useLoginWithOAuth({
     onComplete: async () => {
       // After OAuth completes, user info will be available in the Privy user hook
-      // Call backend login with the Privy user data
+      // Save the Privy session details locally
       try {
-        if (user?.wallet?.address) {
-          const oauthType = user?.linkedAccounts?.find((acc) => acc.type === 'oauth')?.type || 'oauth';
-          const oauthProvider = user?.linkedAccounts?.find((acc) => acc.type === 'oauth')?.providerName || 'google';
+        console.log('[LoginModal] OAuth onComplete user snapshot', {
+          isReady,
+          userId: user?.id || 'none',
+          hasWallet: !!user?.wallet?.address,
+          walletAddress: summarizeAddress(user?.wallet?.address),
+          hasEmail: !!user?.email?.address,
+        });
+        console.log('[LoginModal] OAuth completed, saving session');
+        const oauthProvider =
+          user?.linkedAccounts?.find((acc) => acc.type === 'oauth')?.providerName ||
+          'google';
+        const session = persistAuthSession({
+          source: 'oauth',
+          loginType: oauthProvider,
+        });
 
-          await backendLogin({
-            privyMetaData: {
-              address: user.wallet.address,
-              discord: user?.linkedAccounts?.find((acc) => acc.providerName === 'discord')?.email || '',
-              email: user?.email?.address || '',
-              type: oauthProvider,
-              privyUserId: user?.id || '',
-            },
-          });
+        if (session) {
+          console.log('[LoginModal] OAuth login session saved, handling success');
+          await handleLoginSuccess(session);
         } else {
-          console.log('[LoginModal] OAuth completed, but wallet address not yet available');
+          console.error('[LoginModal] Failed to save OAuth login session');
+          setError('Login failed. Please try again.');
         }
       } catch (err) {
-        console.error('[LoginModal] backendLogin failed from OAuth', err);
+        console.error('[LoginModal] OAuth login failed', err);
         setError('Failed to complete OAuth login. Please try again.');
         return;
       }
-      onClose?.();
     },
     onError: (err) => {
       setError(getErrorMessage(err, 'OAuth error'));
@@ -475,30 +986,39 @@ function LoginModal({ open, onClose, logoSrc }) {
 
   const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail({
     onComplete: async () => {
-      // After email login completes, call backend login with email user data
+      // After email login completes, save the Privy session details locally
       try {
-        if (user?.wallet?.address) {
-          await backendLogin({
-            privyMetaData: {
-              address: user.wallet.address,
-              discord: '',
-              email: user?.email?.address || '',
-              type: 'email',
-              privyUserId: user?.id || '',
-            },
-          });
+        console.log('[LoginModal] Email onComplete user snapshot', {
+          isReady,
+          userId: user?.id || 'none',
+          hasWallet: !!user?.wallet?.address,
+          walletAddress: summarizeAddress(user?.wallet?.address),
+          hasEmail: !!user?.email?.address,
+        });
+        console.log('[LoginModal] Email login completed, saving session');
+        const session = persistAuthSession({
+          source: 'email',
+          loginType: 'email',
+        });
+
+        if (session) {
+          console.log('[LoginModal] Email login session saved, handling success');
+          await handleLoginSuccess(session);
+        } else {
+          console.error('[LoginModal] Failed to save email login session');
+          setError('Login failed. Please try again.');
         }
       } catch (err) {
-        console.error('[LoginModal] backendLogin failed from email', err);
+        console.error('[LoginModal] Email login failed', err);
         setError('Failed to complete email login. Please try again.');
         return;
       }
-      onClose?.();
     },
     onError: (err) => setError(getErrorMessage(err, 'Email login error')),
   });
 
   useEffect(() => {
+    console.log('[LoginModal] Resetting modal state', { open });
     setError('');
     setEmail('');
     setCode('');
@@ -506,6 +1026,10 @@ function LoginModal({ open, onClose, logoSrc }) {
   }, [open]);
 
   useEffect(() => {
+    console.log('[LoginModal] Dialog visibility update', {
+      open,
+      dialogOpen: dialogRef.current?.open,
+    });
     if (open && dialogRef.current && !dialogRef.current.open) {
       dialogRef.current.showModal();
     }
@@ -527,19 +1051,41 @@ function LoginModal({ open, onClose, logoSrc }) {
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!emailState?.status) return;
+    console.log('[LoginModal] Email auth state changed', { status: emailState.status });
+  }, [emailState?.status]);
+
+  useEffect(() => {
+    console.log('[LoginModal] OAuth loading state', { oauthLoading });
+  }, [oauthLoading]);
+
+  useEffect(() => {
+    console.log('[LoginModal] Gate wallet connecting state', { gateConnecting });
+  }, [gateConnecting]);
+
   const handleConnectWallet = () => {
-    console.log('[LoginModal] Connect wallet button clicked');
+    console.log('[LoginModal] 🔌 Connect wallet button clicked');
     try {
-      if (dialogRef.current?.open) dialogRef.current.close();
-    } catch {
-      // ignore
+      if (dialogRef.current?.open) {
+        console.log('[LoginModal] Closing dialog');
+        dialogRef.current.close();
+      }
+    } catch (err) {
+      console.error('[LoginModal] Error closing dialog:', err);
     }
+    console.log('[LoginModal] Calling onClose');
     onClose?.();
+    console.log('[LoginModal] About to call connectWallet()');
     setTimeout(() => {
       try {
+        console.log('[LoginModal] 🚀 Triggering connectWallet hook');
+        console.log('[LoginModal] connectWallet function:', connectWallet);
         connectWallet();
-      } catch {
-        // ignore
+        console.log('[LoginModal] connectWallet() called');
+      } catch (err) {
+        console.error('[LoginModal] Error calling connectWallet:', err);
+        setError('Failed to initiate wallet connection. Please try again.');
       }
     }, 50);
   };
@@ -562,11 +1108,26 @@ function LoginModal({ open, onClose, logoSrc }) {
         throw new Error('Gate Wallet did not return an address.');
       }
 
+      console.log('[LoginModal] Gate Wallet connected', {
+        address: summarizeAddress(address),
+        accountCount: Array.isArray(accountInfo?.accounts) ? accountInfo.accounts.length : 0,
+      });
+
       // 2. Check Network
       let network = await getGateWalletCurrentNetwork().catch(() => undefined);
+      const rawChainId = typeof network === 'string' ? network : network?.chainId;
 
       const normalized = normalizeChainId(network?.chainId);
+      const normalizedFromRaw = normalizeChainId(rawChainId);
       const allowed = String(allowedChain.decimalChainId);
+
+      console.log('[LoginModal] Gate Wallet network response', {
+        rawNetwork: network,
+        rawChainId,
+        normalized,
+        normalizedFromRaw,
+        allowed,
+      });
 
       // If network is null (All Networks) or mismatch, try to switch
       if (network === null || (normalized && normalized !== allowed)) {
@@ -574,6 +1135,7 @@ function LoginModal({ open, onClose, logoSrc }) {
           await switchGateWalletNetwork(allowedChain.hexChainId);
           // Re-check network after switch
           network = await getGateWalletCurrentNetwork().catch(() => undefined);
+          console.log('[LoginModal] Gate Wallet network after switch', { network });
         } catch (switchError) {
           console.warn('Failed to auto-switch network:', switchError);
         }
@@ -581,6 +1143,11 @@ function LoginModal({ open, onClose, logoSrc }) {
 
       // 3. Verify Final Network State
       const finalNormalized = normalizeChainId(network?.chainId);
+      console.log('[LoginModal] Gate Wallet network final check', {
+        network,
+        finalNormalized,
+        allowed,
+      });
       if (network === null) {
         throw new Error(
           'Gate Wallet is set to All Networks. Please select 0G Mainnet manually.'
@@ -596,21 +1163,25 @@ function LoginModal({ open, onClose, logoSrc }) {
       // 4. Proceed to Backend Login
       console.log('[LoginModal] Logging in with Gate Wallet address:', address);
 
-      const payload = {
-        privyMetaData: {
-          address: address,
-          discord: '',
-          email: user?.email?.address || '',
-          type: 'gate_wallet',
-          privyUserId: user?.id || '',
-        },
-      };
+      const session = persistAuthSession({
+        source: 'gate_wallet',
+        loginType: 'gate_wallet',
+        walletAddress: address,
+      });
 
-      const res = await backendLogin(payload);
-      console.log('[LoginModal] Gate Wallet backend login result', res);
+      console.log('[LoginModal] Gate Wallet login session saved', {
+        hasSession: !!session,
+        walletAddress: summarizeAddress(address),
+      });
 
-      localStorage.setItem('sessionWallet', 'VERIFIED');
-      onClose?.();
+      if (session) {
+        console.log('[LoginModal] Gate Wallet login successful, handling success');
+        localStorage.setItem('sessionWallet', 'VERIFIED');
+        await handleLoginSuccess(session);
+      } else {
+        console.error('[LoginModal] Failed to save Gate Wallet login session');
+        setError('Login failed. Please try again.');
+      }
     } catch (err) {
       console.error('Gate wallet connection error:', err);
       setError(err?.message || 'Failed to connect Gate Wallet.');
@@ -763,7 +1334,7 @@ function LoginModal({ open, onClose, logoSrc }) {
           )}
         </form>
 
-        <div style={{ marginTop: 14 }}>
+        {/* <div style={{ marginTop: 14 }}>
           <button
             style={styles.gateBtn}
             onClick={handleGateConnect}
@@ -775,7 +1346,7 @@ function LoginModal({ open, onClose, logoSrc }) {
             </span>
             <span>{gateConnecting ? 'Connecting...' : 'Connect Gate Wallet'}</span>
           </button>
-        </div>
+        </div> */}
 
         <div style={{ marginTop: 14, display: 'flex' }}>
           <button

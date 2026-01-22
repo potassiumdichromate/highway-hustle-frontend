@@ -1,14 +1,39 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Zap } from 'lucide-react';
 import SynthwaveBackground from '../components/SynthwaveBackground';
 import LoginModal from '../components/LoginModal';
+import { isSessionActive } from '../lib/authSession';
 import './Login.css';
 
 export default function Login() {
   const navigate = useNavigate();
   const [showLoginModal, setShowLoginModal] = useState(false);
+
+  useEffect(() => {
+    const maybeRedirect = () => {
+      if (isSessionActive()) {
+        console.log('[Login] Session detected, redirecting to /license');
+        navigate('/license');
+      }
+    };
+
+    if (typeof window !== 'undefined') {
+      maybeRedirect();
+      const handleAuthChange = () => {
+        maybeRedirect();
+      };
+      window.addEventListener('auth:session-change', handleAuthChange);
+      window.addEventListener('presence:token-change', handleAuthChange);
+      return () => {
+        window.removeEventListener('auth:session-change', handleAuthChange);
+        window.removeEventListener('presence:token-change', handleAuthChange);
+      };
+    }
+
+    return undefined;
+  }, [navigate]);
 
   const handleOpenLoginModal = () => {
     console.log('[Login] Opening login modal');

@@ -180,3 +180,13 @@ button:disabled {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Ensure dialog is always on top */
+dialog {
+  z-index: 99999;
+}
+
+dialog::backdrop {
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 99998;
+}
