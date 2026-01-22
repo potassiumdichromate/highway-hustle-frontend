@@ -2,6 +2,8 @@
  * Authentication API calls
  */
 
+import { clearAuthSession } from '../lib/authSession';
+
 // API interceptor - adjust based on your actual implementation
 const apiInterceptor = async (config) => {
   const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
@@ -111,6 +113,8 @@ export const logout = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
+    localStorage.removeItem('sessionWallet');
+    clearAuthSession();
     window.dispatchEvent(new CustomEvent('presence:token-change', { detail: null }));
   }
 };

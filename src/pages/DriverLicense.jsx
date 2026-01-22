@@ -87,20 +87,46 @@ export default function DriverLicense() {
 
   const handleLogout = async () => {
     console.log('[DriverLicense] Logout requested');
+    
+    // 1. Clear auth credentials (token, username, session data)
+    try {
+      clearAuth();
+      console.log('[DriverLicense] Auth cleared');
+    } catch (err) {
+      console.warn('[DriverLicense] Auth clear failed', err);
+    }
+
+    // 2. Disconnect Privy session
     try {
       if (privyLogout) {
         await privyLogout();
+        console.log('[DriverLicense] Privy logout succeeded');
       }
     } catch (err) {
       console.warn('[DriverLicense] Privy logout failed', err);
     }
+
+    // 3. Disconnect wallet
     try {
       disconnectWallet();
+      console.log('[DriverLicense] Wallet disconnected');
     } catch (err) {
       console.warn('[DriverLicense] Wallet disconnect failed', err);
     }
-    clearAuth();
-    navigate('/');
+
+    // 4. Clear localStorage completely
+    try {
+      localStorage.removeItem('sessionWallet');
+      localStorage.removeItem('privySession');
+      localStorage.removeItem('privyUser');
+      console.log('[DriverLicense] LocalStorage cleared');
+    } catch (err) {
+      console.warn('[DriverLicense] LocalStorage clear failed', err);
+    }
+
+    // 5. Navigate to login
+    console.log('[DriverLicense] Navigating to login page');
+    navigate('/', { replace: true });
   };
 
   const sections = [
