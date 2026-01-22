@@ -1,23 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useWallet } from '../context/WalletContext';
 import { motion } from 'framer-motion';
-import { Zap, Wallet } from 'lucide-react';
+import { Zap } from 'lucide-react';
 import SynthwaveBackground from '../components/SynthwaveBackground';
+import LoginModal from '../components/LoginModal';
 import './Login.css';
 
 export default function Login() {
-  const { connectWallet, isConnecting, error, isConnected } = useWallet();
   const navigate = useNavigate();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
-  React.useEffect(() => {
-    if (isConnected) {
-      navigate('/license');
-    }
-  }, [isConnected, navigate]);
-
-  const handleConnect = async () => {
-    await connectWallet();
+  const handleOpenLoginModal = () => {
+    console.log('[Login] Opening login modal');
+    setShowLoginModal(true);
   };
 
   return (
@@ -47,62 +42,21 @@ export default function Login() {
             <p className="game-subtitle">Kult Games</p>
           </motion.div>
 
-          {/* Connection Card */}
+          {/* Login Button */}
           <motion.div
             className="connect-card glass-card"
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4, duration: 0.6 }}
           >
-            <div className="connect-card-header">
-              <Wallet size={40} className="wallet-icon" />
-              <h2>Connect Your Wallet</h2>
-              <p>Link your MetaMask to access the Highway</p>
-            </div>
-
-            {error && (
-              <motion.div
-                className="error-message"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-              >
-                <p>{error}</p>
-              </motion.div>
-            )}
-
             <motion.button
               className="connect-button"
-              onClick={handleConnect}
-              disabled={isConnecting}
+              onClick={handleOpenLoginModal}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
-              {isConnecting ? (
-                <span className="connecting-text">
-                  <span className="spinner"></span>
-                  CONNECTING...
-                </span>
-              ) : (
-                <>
-                  <Wallet size={24} />
-                  CONNECT METAMASK
-                </>
-              )}
+              LOGIN
             </motion.button>
-
-            <div className="wallet-info">
-              <p className="info-text">
-                Don't have MetaMask?{' '}
-                <a
-                  href="https://metamask.io/download/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="metamask-link"
-                >
-                  Install here
-                </a>
-              </p>
-            </div>
           </motion.div>
 
           {/* Features */}
@@ -140,6 +94,18 @@ export default function Login() {
           </motion.div>
         </motion.div>
       </div>
+
+      {/* Login Modal */}
+      {showLoginModal && (
+        <LoginModal 
+          open={showLoginModal}
+          onClose={() => {
+            console.log('[Login] Closing login modal');
+            setShowLoginModal(false);
+          }}
+          logoSrc=""
+        />
+      )}
     </div>
   );
 }

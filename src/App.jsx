@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { PrivyProvider } from '@privy-io/react-auth';
 import { WalletProvider } from './context/WalletContext';
 import Login from './pages/Login';
 import DriverLicense from './pages/DriverLicense';
@@ -7,7 +8,7 @@ import Game from './pages/Game';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
-function App() {
+function AppContent() {
   return (
     <WalletProvider>
       <Router>
@@ -33,6 +34,14 @@ function App() {
         </Routes>
       </Router>
     </WalletProvider>
+  );
+}
+
+function App() {
+  return (
+    <PrivyProvider appId={import.meta.env.VITE_PRIVY_APP_ID || 'your-privy-app-id'}>
+      <AppContent />
+    </PrivyProvider>
   );
 }
 
