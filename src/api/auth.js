@@ -2,21 +2,12 @@
  * Authentication API calls
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
-console.log('[api] Using API base URL:', API_BASE_URL);
-
 // API interceptor - adjust based on your actual implementation
 const apiInterceptor = async (config) => {
-  const url = `${API_BASE_URL}${config.url}`;
-  const method = (config.method || 'GET').toUpperCase();
+  const baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+  const url = `${baseURL}${config.url}`;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const dataSummary =
-    config.data && typeof config.data === 'object'
-      ? Object.keys(config.data)
-      : config.data
-      ? typeof config.data
-      : null;
 
   const headers = {
     'Content-Type': 'application/json',
@@ -25,13 +16,6 @@ const apiInterceptor = async (config) => {
   };
 
   try {
-    console.log('[api] Request', {
-      method,
-      url,
-      hasToken: !!token,
-      dataSummary,
-    });
-
     const response = await fetch(url, {
       method: config.method || 'GET',
       headers,
@@ -43,32 +27,8 @@ const apiInterceptor = async (config) => {
     }
 
     const jsonData = await response.json();
-    const responseSummary =
-      jsonData && typeof jsonData === 'object'
-        ? {
-            success: jsonData.success,
-            message: jsonData.message,
-            dataKeys:
-              jsonData.data && typeof jsonData.data === 'object'
-                ? Object.keys(jsonData.data)
-                : undefined,
-          }
-        : { dataType: typeof jsonData };
-
-    console.log('[api] Response', {
-      method,
-      url,
-      status: response.status,
-      ok: response.ok,
-      ...responseSummary,
-    });
     return { data: jsonData };
   } catch (error) {
-    console.error('[api] Request failed', {
-      method,
-      url,
-      message: error?.message || error,
-    });
     console.error('API request failed:', error);
     throw error;
   }
@@ -121,12 +81,6 @@ export const login = async (payload = {}) => {
         localStorage.setItem('username', userName);
       }
 
-      // Save privyMetaData to localStorage
-      if (payload.privyMetaData) {
-        localStorage.setItem('privyMetaData', JSON.stringify(payload.privyMetaData));
-        console.log('[api/login] Saved privyMetaData to localStorage:', payload.privyMetaData);
-      }
-
       // Dispatch custom event for token changes
       window.dispatchEvent(
         new CustomEvent('presence:token-change', { detail: newToken })
@@ -135,7 +89,6 @@ export const login = async (payload = {}) => {
       console.log('[api/login] Login succeeded; token and username stored', {
         hasToken: !!newToken,
         username: userName,
-        hasPrivyMetaData: !!payload.privyMetaData,
       });
     }
 
@@ -156,25 +109,9 @@ export const login = async (payload = {}) => {
  */
 export const logout = () => {
   if (typeof window !== 'undefined') {
-    const privyKeys = [];
-    for (let i = 0; i < localStorage.length; i += 1) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('privy:')) {
-        privyKeys.push(key);
-      }
-    }
     localStorage.removeItem('token');
     localStorage.removeItem('username');
-    localStorage.removeItem('privyMetaData');
-    localStorage.removeItem('privySession');
-    localStorage.removeItem('privyUser');
-    localStorage.removeItem('sessionWallet');
-    localStorage.removeItem('source');
-    localStorage.removeItem('presence.pendingMs');
-    localStorage.removeItem('presence.pendingSec');
-    privyKeys.forEach((key) => localStorage.removeItem(key));
     window.dispatchEvent(new CustomEvent('presence:token-change', { detail: null }));
-    window.dispatchEvent(new CustomEvent('auth:session-change', { detail: null }));
   }
 };
 
@@ -183,11 +120,7 @@ export const logout = () => {
  */
 export const isAuthenticated = () => {
   if (typeof window === 'undefined') return false;
-  return !!(
-    localStorage.getItem('token') ||
-    localStorage.getItem('privySession') ||
-    localStorage.getItem('privyUser')
-  );
+  return !!localStorage.getItem('token');
 };
 
 /**
