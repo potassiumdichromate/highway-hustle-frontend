@@ -8,6 +8,19 @@ import Game from './pages/Game';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
+const zeroGChain = {
+  id: 16661,
+  name: '0G Mainnet',
+  network: '0g-mainnet',
+  nativeCurrency: { name: '0G', symbol: '0G', decimals: 18 },
+  rpcUrls: {
+    default: { http: ['https://evmrpc.0g.ai'] },
+  },
+  blockExplorers: {
+    default: { name: '0G Explorer', url: 'https://chainscan.0g.ai' },
+  },
+};
+
 function AppContent() {
   return (
     <WalletProvider>
@@ -45,6 +58,8 @@ function App() {
         enabled: true,
       },
     },
+    supportedChains: [zeroGChain],
+    defaultChain: zeroGChain,
     embeddedWallets: {
       ethereum: {
         createOnLogin: 'users-without-wallets',
