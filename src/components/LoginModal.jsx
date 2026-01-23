@@ -391,6 +391,19 @@ function normalizeChainId(chainId) {
   return chainId;
 }
 
+function normalizePrivyChainId(chainId) {
+  if (!chainId) return '';
+  if (typeof chainId === 'number') return String(chainId);
+  if (typeof chainId !== 'string') return '';
+  const trimmed = chainId.trim();
+  if (!trimmed) return '';
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':');
+    return parts[parts.length - 1] || trimmed;
+  }
+  return normalizeChainId(trimmed) || trimmed;
+}
+
 function getNetworkLabel(network) {
   if (network === null) return 'All Networks';
   if (!network) return 'Unknown';
@@ -693,6 +706,33 @@ function LoginModal({ open, onClose, logoSrc }) {
       : '';
     const smartWallet = candidateUser?.smartWallet?.address || '';
     return direct || linked || smartWallet || '';
+  };
+
+  const ensureWalletOnZeroG = async (wallet, source) => {
+    if (!wallet) return false;
+    const walletChainId = normalizePrivyChainId(wallet?.chainId);
+    const expectedChainId = String(allowedChain.decimalChainId);
+    if (walletChainId === expectedChainId) return true;
+
+    if (wallet?.switchChain) {
+      try {
+        console.log('[LoginModal] Switching wallet to 0G Mainnet', {
+          source,
+          from: wallet?.chainId || 'unknown',
+          to: allowedChain.hexChainId,
+        });
+        await wallet.switchChain(allowedChain.hexChainId);
+        return true;
+      } catch (err) {
+        console.error('[LoginModal] Failed to switch wallet to 0G', {
+          source,
+          error: err?.message || err,
+        });
+      }
+    }
+
+    setError('Please switch to 0G Mainnet in your wallet to continue.');
+    return false;
   };
 
   const logLoginParams = (label, params) => {
@@ -1051,6 +1091,8 @@ function LoginModal({ open, onClose, logoSrc }) {
         return;
       }
       try {
+        const onZeroG = await ensureWalletOnZeroG(resolvedWallet, 'wallet');
+        if (!onZeroG) return;
         const walletType =
           resolvedWallet?.walletClientType ||
           resolvedWallet?.connectorType ||
