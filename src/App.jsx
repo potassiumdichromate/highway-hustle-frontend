@@ -39,20 +39,24 @@ function AppContent() {
 
 function App() {
   console.log('[App] Initializing with Privy App ID:', import.meta.env.VITE_PRIVY_APP_ID);
+  const privyConfig = {
+    wallets: {
+      injected: {
+        enabled: true,
+      },
+    },
+    embeddedWallets: {
+      ethereum: {
+        createOnLogin: 'users-without-wallets',
+      },
+    },
+  };
+  console.log('[App] Privy config snapshot', privyConfig);
   
   return (
     <PrivyProvider 
       appId={import.meta.env.VITE_PRIVY_APP_ID}
-      config={{
-        wallets: {
-          injected: {
-            enabled: true,
-          },
-        },
-        embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
-        },
-      }}
+      config={privyConfig}
     >
       <AppContent />
     </PrivyProvider>

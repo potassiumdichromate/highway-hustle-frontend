@@ -114,6 +114,7 @@ export const logout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('username');
     localStorage.removeItem('sessionWallet');
+    localStorage.removeItem('walletAddress');
     clearAuthSession();
     window.dispatchEvent(new CustomEvent('presence:token-change', { detail: null }));
   }

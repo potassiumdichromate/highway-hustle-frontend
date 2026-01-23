@@ -6,6 +6,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import {
   useConnectWallet,
+  useCreateWallet,
   useLoginWithEmail,
   useLoginWithOAuth,
   usePrivy,
@@ -669,6 +670,80 @@ function LoginModal({ open, onClose, logoSrc }) {
   const { user, ready } = usePrivy();
   
   console.log('[LoginModal] Privy initialized:', { ready, user: user?.id });
+  const walletCreationRef = useRef({ inFlight: false, attempts: 0 });
+  const { createWallet } = useCreateWallet({
+    onSuccess: ({ wallet }) => {
+      console.log('[LoginModal] Embedded wallet created', {
+        walletAddress: summarizeAddress(wallet?.address),
+        walletClientType: wallet?.walletClientType || 'unknown',
+        connectorType: wallet?.connectorType || 'unknown',
+      });
+    },
+    onError: (error) => {
+      console.error('[LoginModal] Embedded wallet creation error', error);
+    },
+  });
+
+  const resolveUserWalletAddress = (candidateUser) => {
+    if (!candidateUser) return '';
+    const direct = candidateUser?.wallet?.address || '';
+    const linked = Array.isArray(candidateUser?.linkedAccounts)
+      ? candidateUser.linkedAccounts.find((account) => account?.type === 'wallet')
+          ?.address || ''
+      : '';
+    const smartWallet = candidateUser?.smartWallet?.address || '';
+    return direct || linked || smartWallet || '';
+  };
+
+  const logLoginParams = (label, params) => {
+    const loginAccount = params?.loginAccount;
+    console.log(`[LoginModal] ${label} onComplete params`, {
+      hasUser: !!params?.user,
+      userId: params?.user?.id || 'none',
+      hasWallet: !!params?.user?.wallet?.address,
+      walletAddress: summarizeAddress(params?.user?.wallet?.address),
+      smartWalletAddress: summarizeAddress(params?.user?.smartWallet?.address),
+      loginMethod: params?.loginMethod || 'none',
+      loginAccountType: loginAccount?.type || 'none',
+      loginAccountProvider:
+        loginAccount?.providerName || loginAccount?.provider || 'none',
+      loginAccountAddress: summarizeAddress(loginAccount?.address),
+      isNewUser: params?.isNewUser,
+      wasAlreadyAuthenticated: params?.wasAlreadyAuthenticated,
+    });
+  };
+
+  const ensureEmbeddedWallet = async (candidateUser, source) => {
+    const existingAddress = resolveUserWalletAddress(candidateUser);
+    if (existingAddress) return existingAddress;
+    if (!candidateUser) {
+      console.warn('[LoginModal] Cannot create wallet without user', { source });
+      return '';
+    }
+    if (walletCreationRef.current.inFlight) {
+      console.log('[LoginModal] Wallet creation already in flight', { source });
+      return '';
+    }
+    walletCreationRef.current.inFlight = true;
+    walletCreationRef.current.attempts += 1;
+    try {
+      console.log('[LoginModal] Creating embedded wallet', {
+        source,
+        attempt: walletCreationRef.current.attempts,
+        userId: candidateUser?.id || 'none',
+      });
+      const created = await createWallet();
+      return created?.address || '';
+    } catch (err) {
+      console.error('[LoginModal] Failed to create embedded wallet', {
+        source,
+        error: err?.message || err,
+      });
+      return '';
+    } finally {
+      walletCreationRef.current.inFlight = false;
+    }
+  };
 
   useEffect(() => {
     const linkedAccounts = Array.isArray(user?.linkedAccounts)
@@ -676,14 +751,34 @@ function LoginModal({ open, onClose, logoSrc }) {
           .map((account) => account?.providerName || account?.type)
           .filter(Boolean)
       : [];
+    const linkedWallets = Array.isArray(user?.linkedAccounts)
+      ? user.linkedAccounts.filter((account) => account?.type === 'wallet')
+      : [];
+    const linkedSmartWallets = Array.isArray(user?.linkedAccounts)
+      ? user.linkedAccounts.filter((account) => account?.type === 'smart_wallet')
+      : [];
+    const linkedWalletAddresses = linkedWallets
+      .map((account) => account?.address)
+      .filter(Boolean);
+    const linkedWalletClientTypes = linkedWallets.map(
+      (account) => account?.walletClientType || account?.connectorType || 'unknown'
+    );
 
     console.log('[LoginModal] Privy state update', {
       ready,
       userId: user?.id || 'none',
       hasWallet: !!user?.wallet?.address,
       walletAddress: summarizeAddress(user?.wallet?.address),
+      walletClientType:
+        user?.wallet?.walletClientType || user?.wallet?.connectorType || 'none',
+      smartWalletAddress: summarizeAddress(user?.smartWallet?.address),
+      smartWalletType: user?.smartWallet?.walletClientType || 'none',
       hasEmail: !!user?.email?.address,
       linkedAccounts,
+      linkedWalletCount: linkedWallets.length,
+      linkedWalletAddresses: linkedWalletAddresses.map(summarizeAddress),
+      linkedWalletClientTypes,
+      linkedSmartWalletCount: linkedSmartWallets.length,
     });
 
     const connections = getPrivyConnectionsSnapshot();
@@ -702,7 +797,14 @@ function LoginModal({ open, onClose, logoSrc }) {
     });
   }, [ready, user]);
 
-  const persistAuthSession = ({ source, loginType, wallet, walletAddress }) => {
+  const persistAuthSession = ({
+    source,
+    loginType,
+    wallet,
+    walletAddress,
+    user: userOverride,
+  }) => {
+    const activeUser = userOverride || user;
     const connections = getPrivyConnectionsSnapshot();
     const connectionCandidates = collectConnectionCandidates(connections.parsed);
     const normalizedConnections = normalizeConnectionCandidates(connectionCandidates);
@@ -714,21 +816,21 @@ function LoginModal({ open, onClose, logoSrc }) {
       walletAddress ||
       connectionWalletAddress ||
       wallet?.address ||
-      user?.wallet?.address ||
+      activeUser?.wallet?.address ||
       '';
-    const resolvedUserId = user?.id || connectionUserId || '';
+    const resolvedUserId = activeUser?.id || connectionUserId || '';
     const fallbackLoginType =
-      loginType || wallet?.walletClientType || user?.wallet?.walletClientType;
+      loginType || wallet?.walletClientType || activeUser?.wallet?.walletClientType;
     const resolvedLoginType = resolveLoginTypeFromConnections(
       connectionCandidates,
       fallbackLoginType
     );
-    const resolvedEmail = connectionEmail || user?.email?.address || '';
+    const resolvedEmail = connectionEmail || activeUser?.email?.address || '';
     const resolvedDiscord =
-      connectionDiscord || getDiscordIdentifier(user?.linkedAccounts);
+      connectionDiscord || getDiscordIdentifier(activeUser?.linkedAccounts);
     const linkedAccounts = normalizedConnections.length
       ? normalizedConnections
-      : normalizeLinkedAccounts(user?.linkedAccounts);
+      : normalizeLinkedAccounts(activeUser?.linkedAccounts);
 
     const session = {
       source: source || 'privy',
@@ -765,7 +867,7 @@ function LoginModal({ open, onClose, logoSrc }) {
       connectionKey: connections.key || 'none',
     });
 
-    const userSnapshot = safeSerialize(user);
+    const userSnapshot = safeSerialize(activeUser);
     const sessionPayload = {
       session,
       user: userSnapshot === null ? undefined : userSnapshot,
@@ -774,6 +876,18 @@ function LoginModal({ open, onClose, logoSrc }) {
     if (typeof window !== 'undefined') {
       try {
         localStorage.setItem('privyMetaData', JSON.stringify(privyMetaData));
+        if (resolvedWalletAddress) {
+          localStorage.setItem('walletAddress', resolvedWalletAddress);
+          console.log('[LoginModal] Stored walletAddress in localStorage', {
+            walletAddress: summarizeAddress(resolvedWalletAddress),
+          });
+        } else {
+          console.warn('[LoginModal] No walletAddress available to store', {
+            walletAddress: summarizeAddress(resolvedWalletAddress),
+            connectionWalletAddress: summarizeAddress(connectionWalletAddress),
+            userWalletAddress: summarizeAddress(user?.wallet?.address),
+          });
+        }
       } catch (err) {
         console.error('[LoginModal] Failed to store privyMetaData', err);
       }
@@ -879,6 +993,7 @@ function LoginModal({ open, onClose, logoSrc }) {
       const userSnapshot = getAuthUser();
       const privyMetaDataRaw = localStorage.getItem('privyMetaData');
       const privyMetaData = safeParseJson(privyMetaDataRaw);
+      const storedWalletAddress = localStorage.getItem('walletAddress');
       const sessionRaw = localStorage.getItem('privySession');
       const userRaw = localStorage.getItem('privyUser');
       const sessionActive = isSessionActive();
@@ -892,6 +1007,7 @@ function LoginModal({ open, onClose, logoSrc }) {
         hasUserSnapshot: !!userSnapshot,
         privyUserId: userSnapshot?.id || session?.userId || 'none',
         privyMetaData: privyMetaData || privyMetaDataRaw || 'none',
+        storedWalletAddress: summarizeAddress(storedWalletAddress),
         timestamp: new Date().toISOString(),
       });
 
@@ -988,10 +1104,12 @@ function LoginModal({ open, onClose, logoSrc }) {
   });
 
   const { initOAuth, loading: oauthLoading } = useLoginWithOAuth({
-    onComplete: async () => {
+    onComplete: async (params) => {
+      logLoginParams('OAuth', params);
       // After OAuth completes, user info will be available in the Privy user hook
       // Save the Privy session details locally
       try {
+        const loginUser = params?.user || user;
         if (typeof window !== 'undefined') {
           console.log('[LoginModal] OAuth callback URL', {
             href: window.location.href,
@@ -1001,18 +1119,23 @@ function LoginModal({ open, onClose, logoSrc }) {
         }
         console.log('[LoginModal] OAuth onComplete user snapshot', {
           ready,
-          userId: user?.id || 'none',
-          hasWallet: !!user?.wallet?.address,
-          walletAddress: summarizeAddress(user?.wallet?.address),
-          hasEmail: !!user?.email?.address,
+          userId: loginUser?.id || 'none',
+          hasWallet: !!loginUser?.wallet?.address,
+          walletAddress: summarizeAddress(loginUser?.wallet?.address),
+          hasEmail: !!loginUser?.email?.address,
         });
         console.log('[LoginModal] OAuth completed, saving session');
         const oauthProvider =
-          user?.linkedAccounts?.find((acc) => acc.type === 'oauth')?.providerName ||
+          params?.loginMethod ||
+          params?.loginAccount?.providerName ||
+          loginUser?.linkedAccounts?.find((acc) => acc.type === 'oauth')?.providerName ||
           'google';
+        const ensuredWalletAddress = await ensureEmbeddedWallet(loginUser, 'oauth');
         const session = persistAuthSession({
           source: 'oauth',
           loginType: oauthProvider,
+          walletAddress: ensuredWalletAddress,
+          user: loginUser,
         });
 
         if (session) {
@@ -1034,20 +1157,25 @@ function LoginModal({ open, onClose, logoSrc }) {
   });
 
   const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail({
-    onComplete: async () => {
+    onComplete: async (params) => {
+      logLoginParams('Email', params);
       // After email login completes, save the Privy session details locally
       try {
+        const loginUser = params?.user || user;
         console.log('[LoginModal] Email onComplete user snapshot', {
           ready,
-          userId: user?.id || 'none',
-          hasWallet: !!user?.wallet?.address,
-          walletAddress: summarizeAddress(user?.wallet?.address),
-          hasEmail: !!user?.email?.address,
+          userId: loginUser?.id || 'none',
+          hasWallet: !!loginUser?.wallet?.address,
+          walletAddress: summarizeAddress(loginUser?.wallet?.address),
+          hasEmail: !!loginUser?.email?.address,
         });
         console.log('[LoginModal] Email login completed, saving session');
+        const ensuredWalletAddress = await ensureEmbeddedWallet(loginUser, 'email');
         const session = persistAuthSession({
           source: 'email',
           loginType: 'email',
+          walletAddress: ensuredWalletAddress,
+          user: loginUser,
         });
 
         if (session) {

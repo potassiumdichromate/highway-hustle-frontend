@@ -64,6 +64,7 @@ export const clearAuthSession = () => {
   });
   localStorage.removeItem(AUTH_SESSION_KEY);
   localStorage.removeItem(AUTH_USER_KEY);
+  localStorage.removeItem('walletAddress');
   window.dispatchEvent(new CustomEvent('auth:session-change', { detail: null }));
 };
 

@@ -119,6 +119,7 @@ export default function DriverLicense() {
       localStorage.removeItem('sessionWallet');
       localStorage.removeItem('privySession');
       localStorage.removeItem('privyUser');
+      localStorage.removeItem('walletAddress');
       console.log('[DriverLicense] LocalStorage cleared');
     } catch (err) {
       console.warn('[DriverLicense] LocalStorage clear failed', err);
