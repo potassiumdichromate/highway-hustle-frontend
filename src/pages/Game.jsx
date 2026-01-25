@@ -10,6 +10,7 @@ export default function Game() {
   const navigate = useNavigate();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [walletAddress, setWalletAddress] = useState(null);
 
   const gameModeNames = {
     oneWay: 'One Way',
@@ -18,13 +19,46 @@ export default function Game() {
     timeBomb: 'Time Bomb'
   };
 
-  // Get Unity build URL from config
-  const unityBuildUrl = UNITY_BUILDS.gameModes[gameMode];
+  // Get wallet address from localStorage on component mount
+  useEffect(() => {
+    const wallet = localStorage.getItem('walletAddress');
+    
+    if (wallet) {
+      console.log('✅ Wallet address found:', wallet);
+      setWalletAddress(wallet);
+    } else {
+      console.warn('⚠️ No wallet address found in localStorage');
+      // Optional: Redirect to login or show error
+      // navigate('/');
+    }
+  }, []);
+
+  // Get Unity build URL from config and append wallet parameter
+  const getUnityBuildUrl = () => {
+    const baseUrl = UNITY_BUILDS.gameModes[gameMode];
+    
+    if (!baseUrl) {
+      console.error('❌ Invalid game mode:', gameMode);
+      return '';
+    }
+
+    if (!walletAddress) {
+      console.warn('⚠️ Wallet address not available yet');
+      return baseUrl;
+    }
+
+    // Append wallet address as query parameter
+    const separator = baseUrl.includes('?') ? '&' : '?';
+    const fullUrl = `${baseUrl}${separator}wallet=${encodeURIComponent(walletAddress)}`;
+    
+    console.log('🎮 Unity build URL with wallet:', fullUrl);
+    return fullUrl;
+  };
 
   useEffect(() => {
     // Loading will be handled by iframe onLoad
     setIsLoading(true);
-  }, [gameMode]);
+  }, [gameMode, walletAddress]);
 
   const handleFullscreen = () => {
     const container = document.getElementById('unity-game-container');
@@ -66,6 +100,10 @@ export default function Game() {
     };
   }, []);
 
+  // Don't render iframe until we have wallet address
+  const unityUrl = getUnityBuildUrl();
+  const canLoadGame = walletAddress && unityUrl;
+
   return (
     <div className="game-page">
       {/* Top Bar */}
@@ -82,6 +120,11 @@ export default function Game() {
 
         <div className="game-mode-title">
           <h2>{gameModeNames[gameMode] || 'Game'}</h2>
+          {walletAddress && (
+            <span className="wallet-indicator">
+              {walletAddress.substring(0, 6)}...{walletAddress.substring(walletAddress.length - 4)}
+            </span>
+          )}
         </div>
 
         <button className="fullscreen-btn" onClick={handleFullscreen}>
@@ -92,20 +135,30 @@ export default function Game() {
 
       {/* Unity Game Container */}
       <div id="unity-game-container" className="unity-game-container">
-        {isLoading && (
+        {!canLoadGame && (
+          <div className="game-loading">
+            <div className="loading-spinner"></div>
+            <p>Initializing game...</p>
+            {!walletAddress && <p className="error-text">Waiting for wallet connection...</p>}
+          </div>
+        )}
+
+        {isLoading && canLoadGame && (
           <div className="game-loading">
             <div className="loading-spinner"></div>
             <p>Loading {gameModeNames[gameMode]}...</p>
           </div>
         )}
         
-        <iframe
-          src={unityBuildUrl}
-          title={`Highway Hustle - ${gameModeNames[gameMode]}`}
-          className="unity-game-iframe"
-          allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer"
-          onLoad={() => setIsLoading(false)}
-        />
+        {canLoadGame && (
+          <iframe
+            src={unityUrl}
+            title={`Highway Hustle - ${gameModeNames[gameMode]}`}
+            className="unity-game-iframe"
+            allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer"
+            onLoad={() => setIsLoading(false)}
+          />
+        )}
       </div>
     </div>
   );
