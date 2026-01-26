@@ -8,9 +8,9 @@ const UNITY_BUILDS = {
     // Game mode builds
     gameModes: {
       oneWay: 'https://pub-0025cff360c44334b8cc47c146e9c55c.r2.dev/OneWay/6/index.html',
-      twoWay: 'https://pub-0025cff360c44334b8cc47c146e9c55c.r2.dev/TwoWay/2/index.html',
-      speedRun: 'https://pub-0025cff360c44334b8cc47c146e9c55c.r2.dev/SpeedRun/1/index.html',
-      timeBomb: 'https://pub-0025cff360c44334b8cc47c146e9c55c.r2.dev/TimeBomb/1/index.html'
+      twoWay: 'https://pub-0025cff360c44334b8cc47c146e9c55c.r2.dev/TwoWay/3/index.html',
+      speedRun: 'https://pub-0025cff360c44334b8cc47c146e9c55c.r2.dev/SpeedRun/2/index.html',
+      timeBomb: 'https://pub-0025cff360c44334b8cc47c146e9c55c.r2.dev/TimeBomb/2/index.html'
     }
   };
   
