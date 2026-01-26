@@ -1884,17 +1884,51 @@
   border: none;
 }
 
-/* ==================== GAME MODE SELECTOR ==================== */
+/* ==========================================
+   FIXED GAME MODE SELECTOR MODAL
+   Replace the game mode modal section in DriverLicense.css
+   ========================================== */
+
+/* ==================== GAME MODE SELECTOR MODAL ==================== */
 .game-mode-modal {
   width: 900px;
   max-width: 90vw;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .game-modes-grid-modal {
   padding: 2rem;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(90vh - 100px);
+  /* Smooth scrolling */
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide scrollbar but keep functionality */
+.game-modes-grid-modal::-webkit-scrollbar {
+  width: 6px;
+}
+
+.game-modes-grid-modal::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.game-modes-grid-modal::-webkit-scrollbar-thumb {
+  background: rgba(0, 212, 255, 0.3);
+  border-radius: 3px;
+}
+
+.game-modes-grid-modal::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 212, 255, 0.5);
 }
 
 .game-mode-option {
@@ -1908,6 +1942,11 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 280px;
 }
 
 .game-mode-option::before {
@@ -1929,6 +1968,7 @@
 .game-mode-option:hover {
   border-color: rgba(0, 212, 255, 0.5);
   box-shadow: 0 10px 30px rgba(0, 212, 255, 0.2);
+  transform: translateY(-5px);
 }
 
 .mode-icon-large {
@@ -1937,6 +1977,20 @@
   align-items: center;
   margin-bottom: 1rem;
   filter: drop-shadow(0 0 15px rgba(0, 212, 255, 0.5));
+  flex-shrink: 0;
+}
+
+.mode-icon-img-large {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 15px rgba(0, 212, 255, 0.7));
+  transition: all 0.3s ease;
+}
+
+.game-mode-option:hover .mode-icon-img-large {
+  filter: drop-shadow(0 0 25px rgba(0, 212, 255, 1));
+  transform: scale(1.15);
 }
 
 .game-mode-option h3 {
@@ -1946,6 +2000,7 @@
   margin: 0 0 0.8rem 0;
   color: #fff;
   letter-spacing: 0.08em;
+  flex-shrink: 0;
 }
 
 .mode-description {
@@ -1953,6 +2008,7 @@
   color: rgba(255, 255, 255, 0.7);
   margin-bottom: 1.2rem;
   line-height: 1.5;
+  flex-grow: 1;
 }
 
 .difficulty-badge {
@@ -1963,6 +2019,7 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  flex-shrink: 0;
 }
 
 .difficulty-badge.easy {
@@ -1989,6 +2046,201 @@
   color: #ff0000;
 }
 
+/* Tablet Landscape - 1024px */
+@media (max-width: 1024px) {
+  .game-mode-modal {
+    width: 85vw;
+    max-height: 85vh;
+  }
+
+  .game-modes-grid-modal {
+    padding: 1.8rem;
+    gap: 1.3rem;
+    max-height: calc(85vh - 100px);
+  }
+
+  .game-mode-option {
+    min-height: 260px;
+  }
+}
+
+/* Tablet Portrait - 768px */
+@media (max-width: 768px) {
+  .game-mode-modal {
+    width: 95vw;
+    max-height: 85vh;
+  }
+
+  .game-modes-grid-modal {
+    grid-template-columns: 1fr;
+    padding: 1.5rem;
+    gap: 1.2rem;
+    max-height: calc(85vh - 80px);
+  }
+
+  .game-mode-option {
+    padding: 1.5rem 1.2rem;
+    min-height: 240px;
+  }
+
+  .mode-icon-img-large {
+    width: 70px;
+    height: 70px;
+  }
+
+  .game-mode-option h3 {
+    font-size: 1.2rem;
+  }
+
+  .mode-description {
+    font-size: 0.9rem;
+  }
+
+  .difficulty-badge {
+    font-size: 0.75rem;
+    padding: 0.45rem 0.9rem;
+  }
+}
+
+/* Mobile Landscape - 640px */
+@media (max-width: 640px) and (orientation: landscape) {
+  .game-mode-modal {
+    max-height: 90vh;
+  }
+
+  .game-modes-grid-modal {
+    grid-template-columns: repeat(2, 1fr);
+    padding: 1.2rem;
+    gap: 1rem;
+    max-height: calc(90vh - 70px);
+  }
+
+  .game-mode-option {
+    padding: 1.2rem 1rem;
+    min-height: 220px;
+  }
+
+  .mode-icon-img-large {
+    width: 60px;
+    height: 60px;
+  }
+
+  .game-mode-option h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .mode-description {
+    font-size: 0.85rem;
+    margin-bottom: 0.8rem;
+  }
+}
+
+/* Mobile Portrait - 480px */
+@media (max-width: 480px) {
+  .game-mode-modal {
+    width: 95vw;
+    max-height: 80vh;
+  }
+
+  .game-modes-grid-modal {
+    padding: 1.2rem;
+    gap: 1rem;
+    max-height: calc(80vh - 70px);
+  }
+
+  .game-mode-option {
+    padding: 1.2rem 1rem;
+    min-height: 220px;
+  }
+
+  .mode-icon-img-large {
+    width: 60px;
+    height: 60px;
+  }
+
+  .game-mode-option h3 {
+    font-size: 1.1rem;
+    margin-bottom: 0.6rem;
+  }
+
+  .mode-description {
+    font-size: 0.85rem;
+    margin-bottom: 0.8rem;
+  }
+
+  .difficulty-badge {
+    font-size: 0.75rem;
+    padding: 0.4rem 0.8rem;
+  }
+}
+
+/* Small Mobile - 360px */
+@media (max-width: 360px) {
+  .game-mode-modal {
+    width: 96vw;
+    max-height: 75vh;
+  }
+
+  .game-modes-grid-modal {
+    padding: 1rem;
+    gap: 0.8rem;
+    max-height: calc(75vh - 60px);
+  }
+
+  .game-mode-option {
+    padding: 1rem 0.9rem;
+    min-height: 200px;
+  }
+
+  .mode-icon-img-large {
+    width: 55px;
+    height: 55px;
+  }
+
+  .game-mode-option h3 {
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .mode-description {
+    font-size: 0.8rem;
+    margin-bottom: 0.7rem;
+  }
+
+  .difficulty-badge {
+    font-size: 0.7rem;
+    padding: 0.35rem 0.7rem;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .game-modes-grid-modal {
+    /* Better touch scrolling */
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+
+  .game-mode-option {
+    /* Larger tap target */
+    min-height: 240px;
+  }
+
+  /* Show scrollbar hint on touch devices */
+  .game-modes-grid-modal::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .game-modes-grid-modal::-webkit-scrollbar-thumb {
+    background: rgba(0, 212, 255, 0.5);
+  }
+}
+
+/* Prevent modal content shift when scrollbar appears */
+.modal-content.game-mode-modal {
+  scrollbar-gutter: stable;
+}
 /* ==========================================
    HIGHWAY HUSTLE - COMPREHENSIVE RESPONSIVE CSS
    Replace the existing responsive section in DriverLicense.css
