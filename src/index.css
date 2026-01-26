@@ -26,10 +26,21 @@ body {
   background: var(--dark-bg);
   color: #ffffff;
   overflow-x: hidden;
+  /* Mobile optimizations */
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  /* Prevent text size adjustment */
+  -webkit-text-size-adjust: 100%;
+  -moz-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 #root {
   min-height: 100vh;
+  /* Dynamic viewport height for mobile */
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
 /* Custom scrollbar */
@@ -48,6 +59,13 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(180deg, var(--cyber-blue), var(--neon-blue));
+}
+
+/* Mobile: Hide scrollbar but keep functionality */
+@media (max-width: 768px) {
+  ::-webkit-scrollbar {
+    width: 4px;
+  }
 }
 
 /* Neon glow effects */
@@ -153,6 +171,9 @@ button {
   border: none;
   outline: none;
   transition: all 0.3s ease;
+  /* Mobile touch optimization */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 button:disabled {
@@ -165,6 +186,12 @@ button:disabled {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 2rem;
+}
+
+@media (max-width: 768px) {
+  .container {
+    padding: 0 1rem;
+  }
 }
 
 .glass-card {
@@ -189,4 +216,382 @@ dialog {
 dialog::backdrop {
   background: rgba(0, 0, 0, 0.6);
   z-index: 99998;
+}
+
+/* ==================== MOBILE-FIRST RESPONSIVE UTILITIES ==================== */
+
+/* Prevent Text Selection on UI Elements */
+.no-select {
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Safe Area Insets for Notched Devices */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Prevent Overscroll/Bounce Effect */
+.no-overscroll {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: auto;
+}
+
+/* Smooth Scrolling */
+.smooth-scroll {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Hide Scrollbar but Keep Functionality */
+.scrollbar-hidden {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* Visibility Classes */
+.mobile-only {
+  display: none;
+}
+
+.desktop-only {
+  display: block;
+}
+
+@media (max-width: 768px) {
+  .mobile-only {
+    display: block;
+  }
+  
+  .desktop-only {
+    display: none;
+  }
+  
+  .mobile-flex {
+    display: flex;
+  }
+}
+
+/* Touch-Friendly Spacing */
+.touch-spacing {
+  padding: 0.8rem;
+  margin: 0.5rem 0;
+}
+
+@media (max-width: 768px) {
+  .touch-spacing {
+    padding: 1rem;
+    margin: 0.7rem 0;
+  }
+}
+
+/* Responsive Text Sizes */
+.text-responsive {
+  font-size: clamp(0.875rem, 2vw, 1rem);
+}
+
+.heading-responsive {
+  font-size: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+/* Aspect Ratio Containers */
+.aspect-16-9 {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.aspect-4-3 {
+  aspect-ratio: 4 / 3;
+  width: 100%;
+}
+
+.aspect-1-1 {
+  aspect-ratio: 1 / 1;
+  width: 100%;
+}
+
+/* Grid Auto-Fit Utilities */
+.grid-auto-fit {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .grid-auto-fit {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Flexible Container */
+.container-fluid {
+  width: 100%;
+  padding-right: 1rem;
+  padding-left: 1rem;
+  margin-right: auto;
+  margin-left: auto;
+}
+
+@media (min-width: 768px) {
+  .container-fluid {
+    padding-right: 2rem;
+    padding-left: 2rem;
+  }
+}
+
+@media (min-width: 1200px) {
+  .container-fluid {
+    max-width: 1400px;
+  }
+}
+
+/* Truncate Text */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.truncate-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Stack Vertically on Mobile */
+.stack-mobile {
+  display: flex;
+  gap: 1rem;
+}
+
+@media (max-width: 768px) {
+  .stack-mobile {
+    flex-direction: column;
+  }
+}
+
+/* Loading States */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.05) 25%,
+    rgba(255, 255, 255, 0.1) 50%,
+    rgba(255, 255, 255, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: loading 1.5s ease-in-out infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Pull to Refresh Prevention */
+.prevent-pull-refresh {
+  overscroll-behavior-y: contain;
+  touch-action: pan-x pan-y;
+}
+
+/* iOS Momentum Scrolling */
+.momentum-scroll {
+  -webkit-overflow-scrolling: touch;
+  overflow-y: auto;
+}
+
+/* Better Touch Feedback */
+.touch-feedback {
+  position: relative;
+  overflow: hidden;
+}
+
+.touch-feedback::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.touch-feedback:active::after {
+  width: 300px;
+  height: 300px;
+}
+
+/* Sticky Elements with Safe Area */
+.sticky-top-safe {
+  position: sticky;
+  top: env(safe-area-inset-top);
+  z-index: 100;
+}
+
+.sticky-bottom-safe {
+  position: sticky;
+  bottom: env(safe-area-inset-bottom);
+  z-index: 100;
+}
+
+/* Full Height Minus Safe Areas */
+.full-height-safe {
+  height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+}
+
+/* Orientation Lock Message */
+.orientation-message {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.95);
+  color: white;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 2rem;
+  text-align: center;
+}
+
+@media (max-width: 768px) and (orientation: portrait) {
+  .orientation-required-landscape .orientation-message {
+    display: flex;
+  }
+}
+
+/* Better Click Area for Small Targets */
+.expand-click {
+  position: relative;
+}
+
+.expand-click::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+}
+
+/* Disable Text Resizing in Landscape on iOS */
+@media (max-width: 768px) and (orientation: landscape) {
+  * {
+    -webkit-text-size-adjust: none;
+    text-size-adjust: none;
+  }
+}
+
+/* Focus Visible for Accessibility */
+*:focus-visible {
+  outline: 2px solid #00d4ff;
+  outline-offset: 2px;
+}
+
+/* Remove Focus for Mouse Users */
+*:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+  /* Improve tap targets */
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Prevent double-tap zoom */
+  * {
+    touch-action: manipulation;
+  }
+}
+
+/* High DPI Displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  .neon-text {
+    text-shadow: 
+      0 0 8px currentColor,
+      0 0 16px currentColor,
+      0 0 24px currentColor,
+      0 0 32px var(--neon-pink),
+      0 0 56px var(--neon-pink),
+      0 0 64px var(--neon-pink),
+      0 0 80px var(--neon-pink);
+  }
+}
+
+/* Reduce Motion for Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .scan-line {
+    animation: none;
+  }
+}
+
+/* Dark Mode Support (if needed in future) */
+@media (prefers-color-scheme: light) {
+  /* Keep dark theme regardless */
+  body {
+    background: var(--dark-bg);
+    color: #ffffff;
+  }
+}
+
+/* Print Styles */
+@media print {
+  body {
+    background: white;
+    color: black;
+  }
+  
+  .scan-line,
+  .grain-overlay {
+    display: none;
+  }
+  
+  .neon-text,
+  .gradient-text {
+    color: black;
+    -webkit-text-fill-color: black;
+    text-shadow: none;
+  }
 }
