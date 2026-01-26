@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallet } from '../context/WalletContext';
 import { useNavigate } from 'react-router-dom';
@@ -20,61 +20,21 @@ import {
   Award,
   Settings,
   Edit2,
-  Upload
+  Upload,
+  RefreshCw
 } from 'lucide-react';
 import SynthwaveBackground from '../components/SynthwaveBackground';
 import { logout as clearAuth } from '../api/auth';
 import './DriverLicense.css';
 
-// Mock data
-const mockUserData = {
-  name: 'Road Warrior',
-  level: 42,
-  cars: [
-    { id: 1, name: 'Neon Phantom', rarity: 'Legendary', image: 'car1.png' },
-    { id: 2, name: 'Cyber Cruiser', rarity: 'Epic', image: 'car2.png' },
-    { id: 3, name: 'Street Viper', rarity: 'Rare', image: 'car3.png' }
-  ],
-  stats: {
-    totalRaces: 1247,
-    wins: 892,
-    winRate: 71.5,
-    totalMiles: 45678
-  },
-  missions: [
-    { id: 1, title: 'Win 10 One Way races', progress: 7, total: 10, reward: 500 },
-    { id: 2, title: 'Drive 1000 miles', progress: 847, total: 1000, reward: 1000 },
-    { id: 3, title: 'Complete 5 Timebomb challenges', progress: 3, total: 5, reward: 750 }
-  ]
-};
-
-const gameModesLeaderboard = {
-  oneWay: [
-    { rank: 1, player: 'SpeedDemon', score: 99999, address: '0x1234...5678' },
-    { rank: 2, player: 'NightRider', score: 95432, address: '0xabcd...efgh' },
-    { rank: 3, player: 'TurboKing', score: 91234, address: '0x9876...5432' }
-  ],
-  twoWay: [
-    { rank: 1, player: 'DriftMaster', score: 88888, address: '0x2468...1357' },
-    { rank: 2, player: 'RoadRage', score: 85321, address: '0x1357...2468' },
-    { rank: 3, player: 'VelocityX', score: 82156, address: '0x8642...9753' }
-  ],
-  timebomb: [
-    { rank: 1, player: 'TimeLord', score: 77777, address: '0x3691...2580' },
-    { rank: 2, player: 'BombSquad', score: 74521, address: '0x1593...7530' },
-    { rank: 3, player: 'ClockWork', score: 71234, address: '0x7531...9512' }
-  ],
-  sprint: [
-    { rank: 1, player: 'Lightning', score: 66666, address: '0x9517...5318' },
-    { rank: 2, player: 'FlashPoint', score: 63421, address: '0x7539...5142' },
-    { rank: 3, player: 'RocketMan', score: 60987, address: '0x1593...7531' }
-  ]
-};
+const API_BASE = 'https://highway-hustle-backend.onrender.com/api';
 
 export default function DriverLicense() {
   const { account, disconnectWallet } = useWallet();
   const { logout: privyLogout } = usePrivy();
   const navigate = useNavigate();
+  
+  // State management
   const [activeSection, setActiveSection] = useState('overview');
   const [selectedGameMode, setSelectedGameMode] = useState('oneWay');
   const [chatMessages] = useState([
@@ -84,11 +44,69 @@ export default function DriverLicense() {
   const [aiChatOpen, setAiChatOpen] = useState(false);
   const [garageOpen, setGarageOpen] = useState(false);
   const [gameModeSelectOpen, setGameModeSelectOpen] = useState(false);
+  
+  // Backend data state
+  const [playerData, setPlayerData] = useState(null);
+  const [leaderboardData, setLeaderboardData] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Get wallet address
+  const walletAddress = account || localStorage.getItem('walletAddress');
+
+  // Load player data from backend
+  useEffect(() => {
+    if (walletAddress) {
+      loadPlayerData();
+      loadLeaderboard();
+    }
+  }, [walletAddress]);
+
+  const loadPlayerData = async () => {
+    try {
+      setIsLoading(true);
+      const timestamp = Date.now();
+      const response = await fetch(`${API_BASE}/player/all?user=${walletAddress}&t=${timestamp}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setPlayerData(data.data);
+        console.log('✅ Player data loaded:', data.data);
+      } else {
+        console.error('❌ Failed to load player data');
+      }
+    } catch (error) {
+      console.error('❌ Error loading player data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const loadLeaderboard = async () => {
+    try {
+      const timestamp = Date.now();
+      const response = await fetch(`${API_BASE}/leaderboard?t=${timestamp}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setLeaderboardData(data.leaderboard);
+        console.log('✅ Leaderboard loaded');
+      }
+    } catch (error) {
+      console.error('❌ Error loading leaderboard:', error);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    await loadPlayerData();
+    await loadLeaderboard();
+    setIsRefreshing(false);
+  };
 
   const handleLogout = async () => {
     console.log('[DriverLicense] Logout requested');
     
-    // 1. Clear auth credentials (token, username, session data)
     try {
       clearAuth();
       console.log('[DriverLicense] Auth cleared');
@@ -96,7 +114,6 @@ export default function DriverLicense() {
       console.warn('[DriverLicense] Auth clear failed', err);
     }
 
-    // 2. Disconnect Privy session
     try {
       if (privyLogout) {
         await privyLogout();
@@ -106,7 +123,6 @@ export default function DriverLicense() {
       console.warn('[DriverLicense] Privy logout failed', err);
     }
 
-    // 3. Disconnect wallet
     try {
       disconnectWallet();
       console.log('[DriverLicense] Wallet disconnected');
@@ -114,7 +130,6 @@ export default function DriverLicense() {
       console.warn('[DriverLicense] Wallet disconnect failed', err);
     }
 
-    // 4. Clear localStorage completely
     try {
       localStorage.removeItem('sessionWallet');
       localStorage.removeItem('privySession');
@@ -125,7 +140,6 @@ export default function DriverLicense() {
       console.warn('[DriverLicense] LocalStorage clear failed', err);
     }
 
-    // 5. Navigate to login
     console.log('[DriverLicense] Navigating to login page');
     navigate('/', { replace: true });
   };
@@ -141,29 +155,48 @@ export default function DriverLicense() {
   ];
 
   const renderContent = () => {
+    if (isLoading) {
+      return (
+        <div className="loading-container">
+          <div className="loading-spinner"></div>
+          <p>Loading your data...</p>
+        </div>
+      );
+    }
+
+    if (!playerData) {
+      return (
+        <div className="error-container">
+          <p>Failed to load player data</p>
+          <button onClick={loadPlayerData}>Retry</button>
+        </div>
+      );
+    }
+
     switch (activeSection) {
       case 'overview':
-        return <OverviewSection userData={mockUserData} />;
+        return <OverviewSection playerData={playerData} walletAddress={walletAddress} onRefresh={handleRefresh} />;
       case 'garage':
-        return <GarageSection cars={mockUserData.cars} />;
+        return <GarageSection playerData={playerData} />;
       case 'leaderboard':
         return (
           <LeaderboardSection
             selectedGameMode={selectedGameMode}
             setSelectedGameMode={setSelectedGameMode}
-            leaderboardData={gameModesLeaderboard}
+            leaderboardData={leaderboardData}
+            playerData={playerData}
           />
         );
       case 'marketplace':
         return <MarketplaceSection />;
       case 'missions':
-        return <MissionsSection missions={mockUserData.missions} />;
+        return <MissionsSection playerData={playerData} onRefresh={handleRefresh} />;
       case 'friends':
         return <FriendsSection />;
       case 'chat':
         return <ChatSection messages={chatMessages} />;
       default:
-        return <OverviewSection userData={mockUserData} />;
+        return <OverviewSection playerData={playerData} walletAddress={walletAddress} onRefresh={handleRefresh} />;
     }
   };
 
@@ -188,9 +221,17 @@ export default function DriverLicense() {
         </div>
 
         <div className="top-bar-right">
+          <button 
+            className="icon-btn" 
+            onClick={handleRefresh}
+            disabled={isRefreshing}
+            title="Refresh data"
+          >
+            <RefreshCw size={20} className={isRefreshing ? 'spinning' : ''} />
+          </button>
           <div className="wallet-badge">
             <User size={18} />
-            <span>{account?.slice(0, 6)}...{account?.slice(-4)}</span>
+            <span>{walletAddress?.slice(0, 6)}...{walletAddress?.slice(-4)}</span>
           </div>
           <button className="icon-btn" onClick={handleLogout}>
             <LogOut size={20} />
@@ -311,7 +352,7 @@ export default function DriverLicense() {
       {/* My Garage Modal */}
       <AnimatePresence>
         {garageOpen && (
-          <GarageModal onClose={() => setGarageOpen(false)} />
+          <GarageModal onClose={() => setGarageOpen(false)} walletAddress={walletAddress} />
         )}
       </AnimatePresence>
 
@@ -326,8 +367,9 @@ export default function DriverLicense() {
 }
 
 // Garage Modal Component
-function GarageModal({ onClose }) {
-  const unityBuildUrl = '/unity-builds/garage'; // Update with your actual Unity build path
+function GarageModal({ onClose, walletAddress }) {
+  // Update with your actual R2 garage URL
+  const garageUrl = `https://your-r2-bucket.r2.dev/Garage/index.html?wallet=${walletAddress}`;
 
   return (
     <motion.div
@@ -355,7 +397,7 @@ function GarageModal({ onClose }) {
         
         <div className="unity-container">
           <iframe
-            src={unityBuildUrl}
+            src={garageUrl}
             title="Garage"
             className="unity-iframe"
             allow="autoplay; fullscreen; encrypted-media"
@@ -402,7 +444,6 @@ function GameModeSelector({ onClose }) {
   ];
 
   const handleModeSelect = (modeId) => {
-    // Navigate to game page with selected mode
     navigate(`/game/${modeId}`);
   };
 
@@ -456,25 +497,91 @@ function GameModeSelector({ onClose }) {
 }
 
 // Section Components
-function OverviewSection({ userData }) {
+function OverviewSection({ playerData, walletAddress, onRefresh }) {
   const [isEditingName, setIsEditingName] = useState(false);
-  const [displayName, setDisplayName] = useState(userData.name);
-  const [tempName, setTempName] = useState(userData.name);
+  const [displayName, setDisplayName] = useState(playerData?.userGameData?.playerName || 'Unnamed');
+  const [tempName, setTempName] = useState(displayName);
+  const [isSavingName, setIsSavingName] = useState(false);
 
+  // Update display name when playerData changes
+  useEffect(() => {
+    if (playerData?.userGameData?.playerName) {
+      setDisplayName(playerData.userGameData.playerName);
+      setTempName(playerData.userGameData.playerName);
+    }
+  }, [playerData]);
+
+  const handleSaveName = async () => {
+    if (!tempName || tempName === displayName) {
+      setIsEditingName(false);
+      return;
+    }
+
+    setIsSavingName(true);
+    try {
+      const timestamp = Date.now();
+      const response = await fetch(`${API_BASE}/player/game?user=${walletAddress}&t=${timestamp}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerName: tempName })
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        setDisplayName(tempName);
+        setIsEditingName(false);
+        console.log('✅ Player name updated');
+        onRefresh(); // Refresh data
+      }
+    } catch (error) {
+      console.error('❌ Error updating player name:', error);
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  // Calculate stats from backend data
+  const stats = {
+    totalScore: (playerData?.playerGameModeData?.bestScoreOneWay || 0) + 
+                (playerData?.playerGameModeData?.bestScoreTwoWay || 0) + 
+                (playerData?.playerGameModeData?.bestScoreTimeAttack || 0) + 
+                (playerData?.playerGameModeData?.bestScoreBomb || 0),
+    currency: playerData?.userGameData?.currency || 0,
+    totalPlayedTime: playerData?.userGameData?.totalPlayedTime || 0
+  };
+
+  // Game mode stats from backend
   const gameModeStats = {
-    oneWay: { bestScore: 15420, totalScore: 124567, timePlayed: '12h 34m' },
-    twoWay: { bestScore: 13890, totalScore: 98432, timePlayed: '9h 15m' },
-    speedRun: { bestScore: 18750, totalScore: 145890, timePlayed: '15h 45m' },
-    timeBomb: { bestScore: 12340, totalScore: 87650, timePlayed: '8h 22m' }
+    oneWay: {
+      bestScore: playerData?.playerGameModeData?.bestScoreOneWay || 0,
+      timePlayed: formatPlayTime(playerData?.userGameData?.totalPlayedTime || 0)
+    },
+    twoWay: {
+      bestScore: playerData?.playerGameModeData?.bestScoreTwoWay || 0,
+      timePlayed: formatPlayTime(playerData?.userGameData?.totalPlayedTime || 0)
+    },
+    speedRun: {
+      bestScore: playerData?.playerGameModeData?.bestScoreTimeAttack || 0,
+      timePlayed: formatPlayTime(playerData?.userGameData?.totalPlayedTime || 0)
+    },
+    timeBomb: {
+      bestScore: playerData?.playerGameModeData?.bestScoreBomb || 0,
+      timePlayed: formatPlayTime(playerData?.userGameData?.totalPlayedTime || 0)
+    }
   };
 
+  // Vehicle stats from backend
   const vehicleStats = {
-    selected: 'Neon Phantom',
-    engine: 92,
-    acceleration: 88,
-    brakes: 85,
-    torque: 90
+    selected: getSelectedCarName(playerData?.playerVehicleData?.selectedPlayerCarIndex),
+    JeepOwned: playerData?.playerVehicleData?.JeepOwned || 0,
+    VanOwned: playerData?.playerVehicleData?.VanOwned || 0,
+    SierraOwned: playerData?.playerVehicleData?.SierraOwned || 0,
+    SedanOwned: playerData?.playerVehicleData?.SedanOwned || 0,
+    LamborghiniOwned: playerData?.playerVehicleData?.LamborghiniOwned || 0
   };
+
+  // Calculate level from total score
+  const level = Math.floor(stats.totalScore / 1000) + 1;
 
   return (
     <div className="section">
@@ -500,9 +607,14 @@ function OverviewSection({ userData }) {
                 onChange={(e) => setTempName(e.target.value)}
                 autoFocus
                 maxLength={20}
+                disabled={isSavingName}
               />
-              <button onClick={() => { setDisplayName(tempName); setIsEditingName(false); }}>✓</button>
-              <button onClick={() => { setTempName(displayName); setIsEditingName(false); }}>×</button>
+              <button onClick={handleSaveName} disabled={isSavingName}>
+                {isSavingName ? '...' : '✓'}
+              </button>
+              <button onClick={() => { setTempName(displayName); setIsEditingName(false); }} disabled={isSavingName}>
+                ×
+              </button>
             </div>
           ) : (
             <div className="name-display">
@@ -517,16 +629,16 @@ function OverviewSection({ userData }) {
 
         <div className="level-badge">
           <span className="level-label">LVL</span>
-          <span className="level-num">{userData.level}</span>
+          <span className="level-num">{level}</span>
         </div>
       </div>
 
       {/* Overall Stats */}
       <div className="stats-row">
-        <StatBox icon={<Trophy />} label="Races" value={userData.stats.totalRaces} />
-        <StatBox icon={<Award />} label="Wins" value={userData.stats.wins} />
-        <StatBox icon={<TrendingUp />} label="Win Rate" value={`${userData.stats.winRate}%`} />
-        <StatBox icon={<Zap />} label="Miles" value={userData.stats.totalMiles.toLocaleString()} />
+        <StatBox icon={<Trophy />} label="Total Score" value={stats.totalScore.toLocaleString()} />
+        <StatBox icon={<Award />} label="Currency" value={`$${stats.currency.toLocaleString()}`} />
+        <StatBox icon={<TrendingUp />} label="Level" value={level} />
+        <StatBox icon={<Zap />} label="Play Time" value={formatPlayTime(stats.totalPlayedTime)} />
       </div>
 
       {/* Game Mode Stats */}
@@ -558,17 +670,18 @@ function OverviewSection({ userData }) {
 
       {/* Vehicle Stats */}
       <div className="vehicle-section">
-        <h3 className="subsection-title">VEHICLE SELECTED</h3>
+        <h3 className="subsection-title">VEHICLE GARAGE</h3>
         <div className="vehicle-card">
           <div className="vehicle-header">
             <Car size={32} />
-            <h4>{vehicleStats.selected}</h4>
+            <h4>Current: {vehicleStats.selected}</h4>
           </div>
           <div className="vehicle-stats-grid">
-            <VehicleStatBar label="Engine Tuning" value={vehicleStats.engine} />
-            <VehicleStatBar label="Acceleration" value={vehicleStats.acceleration} />
-            <VehicleStatBar label="Brakes" value={vehicleStats.brakes} />
-            <VehicleStatBar label="Torque" value={vehicleStats.torque} />
+            <VehicleOwnershipBadge label="Jeep" owned={vehicleStats.JeepOwned === 1} />
+            <VehicleOwnershipBadge label="Van" owned={vehicleStats.VanOwned === 1} />
+            <VehicleOwnershipBadge label="Sierra" owned={vehicleStats.SierraOwned === 1} />
+            <VehicleOwnershipBadge label="Sedan" owned={vehicleStats.SedanOwned === 1} />
+            <VehicleOwnershipBadge label="Lamborghini" owned={vehicleStats.LamborghiniOwned === 1} />
           </div>
         </div>
       </div>
@@ -576,11 +689,11 @@ function OverviewSection({ userData }) {
       {/* XP Progress */}
       <div className="xp-section">
         <div className="xp-header">
-          <span>Experience</span>
-          <span>6,500 / 10,000 XP</span>
+          <span>Total Score Progress</span>
+          <span>{stats.totalScore.toLocaleString()} pts</span>
         </div>
         <div className="xp-bar-container">
-          <div className="xp-bar" style={{ width: '65%' }}></div>
+          <div className="xp-bar" style={{ width: `${Math.min((stats.totalScore % 10000) / 100, 100)}%` }}></div>
         </div>
       </div>
     </div>
@@ -603,10 +716,6 @@ function GameModeCard({ title, icon, stats }) {
           <span className="stat-value">{stats.bestScore.toLocaleString()}</span>
         </div>
         <div className="mode-stat">
-          <span className="stat-label">Total Score</span>
-          <span className="stat-value">{stats.totalScore.toLocaleString()}</span>
-        </div>
-        <div className="mode-stat">
           <span className="stat-label">Time Played</span>
           <span className="stat-value">{stats.timePlayed}</span>
         </div>
@@ -615,19 +724,15 @@ function GameModeCard({ title, icon, stats }) {
   );
 }
 
-function VehicleStatBar({ label, value }) {
+function VehicleOwnershipBadge({ label, owned }) {
   return (
-    <div className="vehicle-stat">
-      <div className="vehicle-stat-label">
-        <span>{label}</span>
-        <span className="vehicle-stat-value">{value}%</span>
-      </div>
-      <div className="vehicle-stat-bar-bg">
-        <div 
-          className="vehicle-stat-bar-fill" 
-          style={{ width: `${value}%` }}
-        ></div>
-      </div>
+    <div className={`vehicle-ownership-badge ${owned ? 'owned' : 'locked'}`}>
+      <span className="vehicle-name">{label}</span>
+      {owned ? (
+        <span className="ownership-status">✓ Owned</span>
+      ) : (
+        <Lock size={14} />
+      )}
     </div>
   );
 }
@@ -644,7 +749,17 @@ function StatBox({ icon, label, value }) {
   );
 }
 
-function GarageSection({ cars }) {
+function GarageSection({ playerData }) {
+  const cars = [
+    { id: 0, name: 'Jeep', rarity: 'Common', owned: playerData?.playerVehicleData?.JeepOwned === 1 },
+    { id: 1, name: 'Van', rarity: 'Common', owned: playerData?.playerVehicleData?.VanOwned === 1 },
+    { id: 2, name: 'Sierra', rarity: 'Rare', owned: playerData?.playerVehicleData?.SierraOwned === 1 },
+    { id: 3, name: 'Sedan', rarity: 'Epic', owned: playerData?.playerVehicleData?.SedanOwned === 1 },
+    { id: 4, name: 'Lamborghini', rarity: 'Legendary', owned: playerData?.playerVehicleData?.LamborghiniOwned === 1 }
+  ];
+
+  const selectedCarIndex = playerData?.playerVehicleData?.selectedPlayerCarIndex || 0;
+
   return (
     <div className="section">
       <h2 className="section-title">MY GARAGE</h2>
@@ -652,70 +767,71 @@ function GarageSection({ cars }) {
         {cars.map((car, index) => (
           <motion.div
             key={car.id}
-            className="car-box"
+            className={`car-box ${!car.owned ? 'locked' : ''} ${selectedCarIndex === car.id ? 'selected' : ''}`}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: index * 0.1 }}
-            whileHover={{ y: -8 }}
+            whileHover={{ y: car.owned ? -8 : 0 }}
           >
-            <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>
+            {car.owned && <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>}
+            {selectedCarIndex === car.id && <span className="selected-tag">SELECTED</span>}
             <div className="car-visual">
-              <Car size={56} />
+              {car.owned ? <Car size={56} /> : <Lock size={40} />}
             </div>
             <h3>{car.name}</h3>
-            <button className="select-btn">SELECT</button>
+            {car.owned ? (
+              selectedCarIndex === car.id ? (
+                <button className="select-btn active">EQUIPPED</button>
+              ) : (
+                <button className="select-btn">SELECT</button>
+              )
+            ) : (
+              <button className="select-btn locked">LOCKED</button>
+            )}
           </motion.div>
         ))}
-        <div className="car-box locked">
-          <Lock size={40} />
-          <p>Coming Soon</p>
-        </div>
       </div>
     </div>
   );
 }
 
-function LeaderboardSection({ selectedGameMode, setSelectedGameMode, leaderboardData }) {
-  const modes = [
-    { key: 'oneWay', label: 'One Way' },
-    { key: 'twoWay', label: 'Two Way' },
-    { key: 'timebomb', label: 'Timebomb' },
-    { key: 'sprint', label: 'Sprint' }
-  ];
+function LeaderboardSection({ selectedGameMode, setSelectedGameMode, leaderboardData, playerData }) {
+  // Transform backend leaderboard data
+  const transformedLeaderboard = leaderboardData?.slice(0, 10).map((player, index) => ({
+    rank: index + 1,
+    player: player.userGameData?.playerName || 'Unnamed',
+    score: player.userGameData?.currency || 0,
+    address: player.privyData?.walletAddress?.slice(0, 6) + '...' + player.privyData?.walletAddress?.slice(-4)
+  })) || [];
 
   return (
     <div className="section">
       <h2 className="section-title">GLOBAL LEADERBOARD</h2>
-
-      <div className="mode-tabs">
-        {modes.map((mode) => (
-          <button
-            key={mode.key}
-            className={`mode-tab ${selectedGameMode === mode.key ? 'active' : ''}`}
-            onClick={() => setSelectedGameMode(mode.key)}
-          >
-            {mode.label}
-          </button>
-        ))}
-      </div>
+      <p className="section-subtitle">Top players by total currency</p>
 
       <div className="leaderboard-list">
-        {leaderboardData[selectedGameMode].map((entry, index) => (
-          <motion.div
-            key={entry.rank}
-            className={`lb-entry rank-${entry.rank}`}
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: index * 0.08 }}
-          >
-            <div className="rank-num">#{entry.rank}</div>
-            <div className="player-data">
-              <span className="player-name">{entry.player}</span>
-              <span className="player-addr">{entry.address}</span>
-            </div>
-            <div className="score">{entry.score.toLocaleString()}</div>
-          </motion.div>
-        ))}
+        {transformedLeaderboard.length > 0 ? (
+          transformedLeaderboard.map((entry, index) => (
+            <motion.div
+              key={entry.rank}
+              className={`lb-entry rank-${entry.rank}`}
+              initial={{ opacity: 0, x: -30 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.08 }}
+            >
+              <div className="rank-num">#{entry.rank}</div>
+              <div className="player-data">
+                <span className="player-name">{entry.player}</span>
+                <span className="player-addr">{entry.address}</span>
+              </div>
+              <div className="score">${entry.score.toLocaleString()}</div>
+            </motion.div>
+          ))
+        ) : (
+          <div className="no-data">
+            <p>Loading leaderboard...</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -734,7 +850,21 @@ function MarketplaceSection() {
   );
 }
 
-function MissionsSection({ missions }) {
+function MissionsSection({ playerData, onRefresh }) {
+  const achieved1000M = playerData?.campaignData?.Achieved1000M || false;
+
+  const missions = [
+    {
+      id: 1,
+      title: 'Reach 1000 Meters',
+      description: 'Drive 1000 meters in any game mode',
+      progress: achieved1000M ? 1 : 0,
+      total: 1,
+      reward: 1000,
+      completed: achieved1000M
+    }
+  ];
+
   return (
     <div className="section">
       <h2 className="section-title">ACTIVE MISSIONS</h2>
@@ -742,28 +872,40 @@ function MissionsSection({ missions }) {
         {missions.map((mission, index) => (
           <motion.div
             key={mission.id}
-            className="mission-box"
+            className={`mission-box ${mission.completed ? 'completed' : ''}`}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
             <div className="mission-head">
               <Target size={20} />
-              <h3>{mission.title}</h3>
+              <div>
+                <h3>{mission.title}</h3>
+                <p className="mission-description">{mission.description}</p>
+              </div>
+              {mission.completed && <span className="completed-badge">✓ COMPLETED</span>}
             </div>
             <div className="mission-prog">
               <div className="prog-bar-bg">
-                <div className="prog-bar" style={{ width: `${(mission.progress / mission.total) * 100}%` }}></div>
+                <div 
+                  className="prog-bar" 
+                  style={{ width: `${(mission.progress / mission.total) * 100}%` }}
+                ></div>
               </div>
               <span>{mission.progress} / {mission.total}</span>
             </div>
             <div className="mission-reward">
               <Award size={16} />
               <span>{mission.reward} XP</span>
+              {mission.completed && <span className="claimed-label">CLAIMED</span>}
             </div>
           </motion.div>
         ))}
       </div>
+      <button className="refresh-btn" onClick={onRefresh}>
+        <RefreshCw size={16} />
+        Refresh Missions
+      </button>
     </div>
   );
 }
@@ -804,4 +946,16 @@ function ChatSection({ messages }) {
       </div>
     </div>
   );
+}
+
+// Helper Functions
+function formatPlayTime(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+}
+
+function getSelectedCarName(index) {
+  const carNames = ['Jeep', 'Van', 'Sierra', 'Sedan', 'Lamborghini'];
+  return carNames[index] || 'Jeep';
 }
