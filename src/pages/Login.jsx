@@ -117,7 +117,7 @@ export default function Login() {
             {/* Kult Games Logo */}
             <div className="kult-logo-container">
               <img 
-                src={KultLogo} 
+                src={OGPurpleLogo} 
                 alt="Kult Games" 
                 className="kult-logo"
               />
