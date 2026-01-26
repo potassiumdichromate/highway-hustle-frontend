@@ -9,8 +9,8 @@ import './Login.css';
 
 // Import logos from assets
 import OGPurpleLogo from '../assets/oglogo.png';
-import KultLogo from '../assets/kult-logo.png';
-import HighwayHustleLogo from '../assets/Highway Hustle Logo.png';
+import KultLogo from '../assets/kultLogo.png';
+import HighwayHustleLogo from '../assets/gamelogo.png';
 import OneWayIcon from '../assets/OneWay.png';
 import TwoWayIcon from '../assets/TwoWay.png';
 import SpeedRunIcon from '../assets/SpeedRun.png';
