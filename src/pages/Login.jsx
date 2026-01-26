@@ -11,10 +11,8 @@ import './Login.css';
 import OGPurpleLogo from '../assets/oglogo.png';
 import KultLogo from '../assets/kultLogo.png';
 import HighwayHustleLogo from '../assets/gamelogo.png';
-import OneWayIcon from '../assets/OneWay.png';
-import TwoWayIcon from '../assets/TwoWay.png';
-import SpeedRunIcon from '../assets/SpeedRun.png';
-import TimeBombIcon from '../assets/TimeBomb.png';
+import GameModeIcon from '../assets/gamemode.png';
+import MarketplaceIcon from '../assets/marketplace.png';
 import LeaderboardIcon from '../assets/leaderboard.png';
 
 export default function Login() {
@@ -107,15 +105,6 @@ export default function Login() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.6 }}
           >
-            {/* 0G Purple Logo */}
-            <div className="logo-container">
-              <img 
-                src={OGPurpleLogo} 
-                alt="0G Logo" 
-                className="main-logo"
-              />
-            </div>
-
             {/* Highway Hustle Logo */}
             <div className="highway-logo-container">
               <img 
@@ -160,26 +149,12 @@ export default function Login() {
             transition={{ delay: 0.6, duration: 0.8 }}
           >
             {/* 4 Game Modes */}
-            <div className="feature-item large-feature">
-              <h3 className="feature-title">4 Game Modes</h3>
-              <div className="game-modes-showcase">
-                <div className="game-mode-icon-wrapper">
-                  <img src={OneWayIcon} alt="One Way" className="game-mode-icon" />
-                  <span className="mode-label">One Way</span>
-                </div>
-                <div className="game-mode-icon-wrapper">
-                  <img src={TwoWayIcon} alt="Two Way" className="game-mode-icon" />
-                  <span className="mode-label">Two Way</span>
-                </div>
-                <div className="game-mode-icon-wrapper">
-                  <img src={SpeedRunIcon} alt="Speed Run" className="game-mode-icon" />
-                  <span className="mode-label">Speed Run</span>
-                </div>
-                <div className="game-mode-icon-wrapper">
-                  <img src={TimeBombIcon} alt="Time Bomb" className="game-mode-icon" />
-                  <span className="mode-label">Time Bomb</span>
-                </div>
+            <div className="feature-item">
+              <div className="feature-icon-img">
+                <img src={GameModeIcon} alt="Game Modes" />
               </div>
+              <h3>4 Game Modes</h3>
+              <p>One Way, Two Way, Timebomb, Sprint</p>
             </div>
 
             {/* Global Leaderboard */}
@@ -193,7 +168,9 @@ export default function Login() {
 
             {/* Car Marketplace */}
             <div className="feature-item">
-              <div className="feature-icon">🚗</div>
+              <div className="feature-icon-img">
+                <img src={MarketplaceIcon} alt="Marketplace" />
+              </div>
               <h3>Car Marketplace</h3>
               <p>Collect and upgrade your fleet</p>
             </div>
