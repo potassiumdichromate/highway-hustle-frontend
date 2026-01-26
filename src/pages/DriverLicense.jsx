@@ -27,6 +27,21 @@ import SynthwaveBackground from '../components/SynthwaveBackground';
 import { logout as clearAuth } from '../api/auth';
 import './DriverLicense.css';
 
+// Import game assets
+import CoinIcon from '../assets/coin.png';
+import OneWayIcon from '../assets/OneWay.png';
+import TwoWayIcon from '../assets/TwoWay.png';
+import SpeedRunIcon from '../assets/SpeedRun.png';
+import TimeBombIcon from '../assets/TimeBomb.png';
+
+// Import game assets
+import CoinIcon from '../assets/coin.png';
+import GameModeIcon from '../assets/gamemode.png';
+import OneWayIcon from '../assets/OneWay.png';
+import TwoWayIcon from '../assets/TwoWay.png';
+import SpeedRunIcon from '../assets/SpeedRun.png';
+import TimeBombIcon from '../assets/TimeBomb.png';
+
 const API_BASE = 'https://highway-hustle-backend.onrender.com/api';
 
 export default function DriverLicense() {
@@ -416,28 +431,28 @@ function GameModeSelector({ onClose }) {
     {
       id: 'oneWay',
       name: 'One Way',
-      icon: '🏁',
+      icon: OneWayIcon,
       description: 'Classic endless highway racing',
       difficulty: 'Easy'
     },
     {
       id: 'twoWay',
       name: 'Two Way',
-      icon: '⚡',
+      icon: TwoWayIcon,
       description: 'Dodge oncoming traffic',
       difficulty: 'Medium'
     },
     {
       id: 'speedRun',
       name: 'Speed Run',
-      icon: '🚀',
+      icon: SpeedRunIcon,
       description: 'Short burst speed challenges',
       difficulty: 'Hard'
     },
     {
       id: 'timeBomb',
       name: 'Time Bomb',
-      icon: '💣',
+      icon: TimeBombIcon,
       description: 'Race against the clock',
       difficulty: 'Expert'
     }
@@ -482,7 +497,9 @@ function GameModeSelector({ onClose }) {
               whileHover={{ scale: 1.05, y: -5 }}
               onClick={() => handleModeSelect(mode.id)}
             >
-              <div className="mode-icon-large">{mode.icon}</div>
+              <div className="mode-icon-large">
+                <img src={mode.icon} alt={mode.name} className="mode-icon-img-large" />
+              </div>
               <h3>{mode.name}</h3>
               <p className="mode-description">{mode.description}</p>
               <div className={`difficulty-badge ${mode.difficulty.toLowerCase()}`}>
@@ -636,7 +653,11 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
       {/* Overall Stats */}
       <div className="stats-row">
         <StatBox icon={<Trophy />} label="Total Score" value={stats.totalScore.toLocaleString()} />
-        <StatBox icon={<Award />} label="Currency" value={`$${stats.currency.toLocaleString()}`} />
+        <StatBox 
+          icon={<img src={CoinIcon} alt="Highway Coins" className="stat-coin-icon" />} 
+          label="Highway Coins" 
+          value={stats.currency.toLocaleString()} 
+        />
         <StatBox icon={<TrendingUp />} label="Level" value={level} />
         <StatBox icon={<Zap />} label="Play Time" value={formatPlayTime(stats.totalPlayedTime)} />
       </div>
@@ -648,21 +669,25 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
           <GameModeCard 
             title="One Way" 
             icon="🏁"
+            iconImage={OneWayIcon}
             stats={gameModeStats.oneWay}
           />
           <GameModeCard 
             title="Two Way" 
             icon="⚡"
+            iconImage={TwoWayIcon}
             stats={gameModeStats.twoWay}
           />
           <GameModeCard 
             title="Speed Run" 
             icon="🚀"
+            iconImage={SpeedRunIcon}
             stats={gameModeStats.speedRun}
           />
           <GameModeCard 
             title="Time Bomb" 
             icon="💣"
+            iconImage={TimeBombIcon}
             stats={gameModeStats.timeBomb}
           />
         </div>
@@ -700,14 +725,18 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
   );
 }
 
-function GameModeCard({ title, icon, stats }) {
+function GameModeCard({ title, icon, stats, iconImage }) {
   return (
     <motion.div 
       className="game-mode-card"
       whileHover={{ y: -5 }}
     >
       <div className="mode-header">
-        <span className="mode-icon">{icon}</span>
+        {iconImage ? (
+          <img src={iconImage} alt={title} className="mode-icon-img" />
+        ) : (
+          <span className="mode-icon">{icon}</span>
+        )}
         <h4>{title}</h4>
       </div>
       <div className="mode-stats">
@@ -807,7 +836,7 @@ function LeaderboardSection({ selectedGameMode, setSelectedGameMode, leaderboard
   return (
     <div className="section">
       <h2 className="section-title">GLOBAL LEADERBOARD</h2>
-      <p className="section-subtitle">Top players by total currency</p>
+      <p className="section-subtitle">Top players by Highway Coins</p>
 
       <div className="leaderboard-list">
         {transformedLeaderboard.length > 0 ? (
@@ -824,7 +853,10 @@ function LeaderboardSection({ selectedGameMode, setSelectedGameMode, leaderboard
                 <span className="player-name">{entry.player}</span>
                 <span className="player-addr">{entry.address}</span>
               </div>
-              <div className="score">${entry.score.toLocaleString()}</div>
+              <div className="score">
+                <img src={CoinIcon} alt="Highway Coins" className="lb-coin-icon" />
+                {entry.score.toLocaleString()}
+              </div>
             </motion.div>
           ))
         ) : (

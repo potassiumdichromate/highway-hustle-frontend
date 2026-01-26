@@ -1542,4 +1542,371 @@
     width: 95vw;
     height: 90vh;
   }
+
+  .stat-coin-icon {
+    width: 32px;
+    height: 32px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 8px rgba(255, 215, 0, 0.6));
+    animation: coin-spin 3s linear infinite;
+  }
+  
+  @keyframes coin-spin {
+    0%, 100% {
+      transform: rotateY(0deg);
+    }
+    50% {
+      transform: rotateY(180deg);
+    }
+  }
+  
+  .lb-coin-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    margin-right: 0.5rem;
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.5));
+  }
+  
+  /* Game Mode Icon Styles */
+  .mode-icon-img {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.6));
+    transition: all 0.3s ease;
+  }
+  
+  .game-mode-card:hover .mode-icon-img {
+    filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.9));
+    transform: scale(1.1);
+  }
+  
+  .mode-icon-img-large {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    filter: drop-shadow(0 0 15px rgba(0, 212, 255, 0.7));
+    transition: all 0.3s ease;
+  }
+  
+  .game-mode-option:hover .mode-icon-img-large {
+    filter: drop-shadow(0 0 30px rgba(0, 212, 255, 1));
+    transform: scale(1.05);
+  }
+  
+  .mode-icon-large {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  /* Loading States */
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    gap: 1.5rem;
+  }
+  
+  .loading-spinner {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(0, 212, 255, 0.2);
+    border-top-color: #00d4ff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  
+  .loading-container p {
+    color: #00d4ff;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+    letter-spacing: 0.1em;
+  }
+  
+  /* Refresh Button */
+  .icon-btn.spinning svg {
+    animation: spin 1s linear infinite;
+  }
+  
+  .refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 8px;
+    color: #00d4ff;
+    font-family: var(--font-display);
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    margin-top: 1rem;
+  }
+  
+  .refresh-btn:hover {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: #00d4ff;
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.3);
+  }
+  
+  /* Vehicle Ownership Badges */
+  .vehicle-ownership-badge {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: rgba(0, 212, 255, 0.05);
+    border: 1px solid rgba(0, 212, 255, 0.2);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+  }
+  
+  .vehicle-ownership-badge.owned {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.4);
+  }
+  
+  .vehicle-ownership-badge.locked {
+    opacity: 0.5;
+    background: rgba(128, 128, 128, 0.05);
+    border-color: rgba(128, 128, 128, 0.2);
+  }
+  
+  .vehicle-name {
+    font-family: var(--font-display);
+    font-weight: 600;
+    color: #fff;
+    font-size: 0.9rem;
+  }
+  
+  .ownership-status {
+    color: #00d4ff;
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  
+  /* Mission Completed State */
+  .mission-box.completed {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.4);
+  }
+  
+  .mission-box.completed .prog-bar {
+    background: linear-gradient(90deg, #00d4ff, #00ffaa);
+  }
+  
+  .completed-badge {
+    padding: 0.25rem 0.75rem;
+    background: rgba(0, 255, 170, 0.2);
+    border: 1px solid rgba(0, 255, 170, 0.4);
+    border-radius: 12px;
+    color: #00ffaa;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+  
+  .claimed-label {
+    color: #00ffaa;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-left: 0.5rem;
+  }
+  
+  .mission-description {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+    margin-top: 0.25rem;
+  }
+  
+  /* Car Selection States */
+  .car-box.selected {
+    border-color: #00d4ff;
+    box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+    background: rgba(0, 212, 255, 0.1);
+  }
+  
+  .selected-tag {
+    position: absolute;
+    top: 0.75rem;
+    right: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    background: rgba(0, 212, 255, 0.9);
+    border-radius: 12px;
+    color: #000;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    z-index: 2;
+  }
+  
+  .select-btn.active {
+    background: rgba(0, 212, 255, 0.2);
+    border-color: #00d4ff;
+    cursor: default;
+  }
+  
+  .select-btn.locked {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  /* Error Container */
+  .error-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 400px;
+    gap: 1rem;
+  }
+  
+  .error-container p {
+    color: #ff006e;
+    font-family: var(--font-display);
+    font-size: 1.1rem;
+  }
+  
+  .error-container button {
+    padding: 0.75rem 1.5rem;
+    background: rgba(255, 0, 110, 0.2);
+    border: 1px solid rgba(255, 0, 110, 0.4);
+    border-radius: 8px;
+    color: #ff006e;
+    font-family: var(--font-display);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .error-container button:hover {
+    background: rgba(255, 0, 110, 0.3);
+    border-color: #ff006e;
+  }
+  
+  /* Leaderboard Improvements */
+  .section-subtitle {
+    text-align: center;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.9rem;
+    margin-top: -1rem;
+    margin-bottom: 2rem;
+    font-family: var(--font-display);
+  }
+  
+  .no-data {
+    text-align: center;
+    padding: 3rem;
+    color: rgba(255, 255, 255, 0.5);
+  }
+  
+  /* Name Edit Improvements */
+  .name-edit input {
+    padding: 0.5rem;
+    background: rgba(0, 212, 255, 0.1);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 6px;
+    color: #fff;
+    font-family: var(--font-display);
+    font-size: 1rem;
+  }
+  
+  .name-edit input:focus {
+    outline: none;
+    border-color: #00d4ff;
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+  }
+  
+  .name-edit button {
+    padding: 0.5rem 0.75rem;
+    background: rgba(0, 212, 255, 0.2);
+    border: 1px solid rgba(0, 212, 255, 0.3);
+    border-radius: 6px;
+    color: #00d4ff;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+  
+  .name-edit button:hover:not(:disabled) {
+    background: rgba(0, 212, 255, 0.3);
+    border-color: #00d4ff;
+  }
+  
+  .name-edit button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  
+  /* Responsive Improvements */
+  @media (max-width: 768px) {
+    .vehicle-stats-grid {
+      grid-template-columns: 1fr;
+    }
+  
+    .vehicle-ownership-badge {
+      padding: 0.5rem 0.75rem;
+    }
+  
+    .mission-description {
+      font-size: 0.8rem;
+    }
+  }
+  
+  /* Game Mode Icon Images */
+  .mode-icon-img {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 10px rgba(0, 212, 255, 0.6));
+    transition: all 0.3s ease;
+  }
+  
+  .game-mode-card:hover .mode-icon-img {
+    filter: drop-shadow(0 0 15px rgba(0, 212, 255, 0.9));
+    transform: scale(1.1);
+  }
+  
+  /* Game Mode Selector Modal Icons */
+  .mode-icon-img-large {
+    width: 80px;
+    height: 80px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 12px rgba(0, 212, 255, 0.7));
+    transition: all 0.3s ease;
+  }
+  
+  .game-mode-option:hover .mode-icon-img-large {
+    filter: drop-shadow(0 0 20px rgba(0, 212, 255, 1));
+    transform: scale(1.15);
+  }
+  
+  /* Leaderboard Coin Icon */
+  .lb-coin-icon {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.6));
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+  
+  .score {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+  }
 }
