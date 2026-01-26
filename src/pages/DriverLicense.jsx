@@ -774,9 +774,59 @@ function StatBox({ icon, label, value }) {
 
 // UPDATED GarageSection - ALL CARS SHOW IMAGES, ONLY SELECTED IS EQUIPPED
 function GarageSection({ playerData }) {
-  const selectedCarIndex = playerData?.playerVehicleData?.selectedPlayerCarIndex || 0;
+  const [selectedCarIndex, setSelectedCarIndex] = useState(playerData?.playerVehicleData?.selectedPlayerCarIndex || 0);
+  const [isSelecting, setIsSelecting] = useState(false);
+  
+  // Get wallet address from localStorage
+  const walletAddress = localStorage.getItem('walletAddress');
 
   console.log('🚗 Selected car index from API:', selectedCarIndex);
+
+  // Update selectedCarIndex when playerData changes
+  useEffect(() => {
+    if (playerData?.playerVehicleData?.selectedPlayerCarIndex !== undefined) {
+      setSelectedCarIndex(playerData.playerVehicleData.selectedPlayerCarIndex);
+    }
+  }, [playerData]);
+
+  // Handle car selection
+  const handleSelectCar = async (carIndex) => {
+    if (carIndex === selectedCarIndex || isSelecting) {
+      return; // Already selected or currently selecting
+    }
+
+    setIsSelecting(true);
+    console.log(`🚗 Selecting car index: ${carIndex}`);
+
+    try {
+      const timestamp = Date.now();
+      const response = await fetch(`${API_BASE}/player/vehicle?user=${walletAddress}&t=${timestamp}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          selectedPlayerCarIndex: carIndex 
+        })
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setSelectedCarIndex(carIndex);
+        console.log(`✅ Car selected successfully: ${CAR_DATA[carIndex].name} (index ${carIndex})`);
+        
+        // Optional: Show success message
+        // You can add a toast notification here if you want
+      } else {
+        console.error('❌ Failed to select car:', data);
+        alert('Failed to select car. Please try again.');
+      }
+    } catch (error) {
+      console.error('❌ Error selecting car:', error);
+      alert('Error selecting car. Please check your connection.');
+    } finally {
+      setIsSelecting(false);
+    }
+  };
 
   // Build cars array from CAR_DATA - ALL cars available
   const cars = Object.keys(CAR_DATA).map(index => {
@@ -792,6 +842,8 @@ function GarageSection({ playerData }) {
   return (
     <div className="section">
       <h2 className="section-title">MY GARAGE</h2>
+      <p className="section-subtitle">Select your vehicle for the next race</p>
+      
       <div className="cars-grid">
         {cars.map((car, index) => {
           const isSelected = selectedCarIndex === car.id;
@@ -799,11 +851,11 @@ function GarageSection({ playerData }) {
           return (
             <motion.div
               key={car.id}
-              className={`car-box ${isSelected ? 'selected' : ''}`}
+              className={`car-box ${isSelected ? 'selected' : ''} ${isSelecting ? 'selecting' : ''}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.1 }}
-              whileHover={{ y: -8 }}
+              whileHover={{ y: isSelected ? 0 : -8 }}
             >
               {/* Rarity tag */}
               <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>
@@ -818,11 +870,19 @@ function GarageSection({ playerData }) {
               
               <h3>{car.name}</h3>
               
-              {/* Button - EQUIPPED if selected, SELECT otherwise */}
+              {/* Button - EQUIPPED if selected, SELECT with click handler otherwise */}
               {isSelected ? (
-                <button className="select-btn active">EQUIPPED</button>
+                <button className="select-btn active" disabled>
+                  EQUIPPED
+                </button>
               ) : (
-                <button className="select-btn">SELECT</button>
+                <button 
+                  className="select-btn" 
+                  onClick={() => handleSelectCar(car.id)}
+                  disabled={isSelecting}
+                >
+                  {isSelecting ? 'SELECTING...' : 'SELECT'}
+                </button>
               )}
             </motion.div>
           );
