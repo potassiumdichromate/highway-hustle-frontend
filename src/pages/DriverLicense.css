@@ -873,15 +873,58 @@
   font-weight: 600;
 }
 
-/* ==================== GARAGE ==================== */
+/* ==========================================
+   PROPER GRID LAYOUT FOR GARAGE - NO HORIZONTAL SCROLL
+   Replace the .cars-grid section in your CSS
+   ========================================== */
+
+/* ==================== GARAGE GRID ==================== */
 .cars-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1.8rem;
+  /* 3 columns on desktop */
+  grid-template-columns: repeat(3, 1fr);
+  gap: 2rem;
   padding: 0.5rem 0;
+  width: 100%;
 }
 
+/* 2 columns on smaller desktop/laptop */
+@media (max-width: 1200px) {
+  .cars-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.8rem;
+  }
+}
+
+/* 2 columns on tablet landscape */
+@media (max-width: 1024px) {
+  .cars-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1.5rem;
+  }
+}
+
+/* Single column on tablet portrait and mobile */
+@media (max-width: 768px) {
+  .cars-grid {
+    grid-template-columns: 1fr;
+    gap: 1.2rem;
+  }
+}
+
+/* Ensure cards don't get too wide on large screens */
+@media (min-width: 1440px) {
+  .cars-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2.2rem;
+    max-width: 1600px;
+  }
+}
+
+/* ==================== CAR BOX STYLING ==================== */
 .car-box {
+  /* Remove any flex or width constraints */
+  width: 100%;
   padding: 2rem 1.8rem;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(15px);
@@ -892,6 +935,10 @@
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   overflow: hidden;
+  /* Ensure consistent height */
+  display: flex;
+  flex-direction: column;
+  min-height: 350px;
 }
 
 /* Animated gradient border effect */
@@ -1034,9 +1081,11 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 1.5rem;
+  margin-top: 1rem;
   position: relative;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.05);
+  flex-shrink: 0;
 }
 
 .car-visual::before {
@@ -1082,7 +1131,8 @@
   font-family: var(--font-display);
   font-size: 1.4rem;
   font-weight: 800;
-  margin-bottom: 1.2rem;
+  margin-bottom: auto;
+  padding-bottom: 1.2rem;
   color: #fff;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1092,7 +1142,7 @@
 .car-box h3::after {
   content: '';
   position: absolute;
-  bottom: -8px;
+  bottom: 8px;
   left: 50%;
   transform: translateX(-50%);
   width: 40px;
@@ -1123,6 +1173,8 @@
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  margin-top: auto;
+  flex-shrink: 0;
 }
 
 .select-btn::before {
@@ -1207,39 +1259,16 @@
   pointer-events: none;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-  .cars-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    gap: 1.5rem;
-  }
-
-  .car-box {
-    padding: 1.8rem 1.5rem;
-  }
-
-  .car-visual {
-    height: 140px;
-  }
-
-  .car-visual svg {
-    width: 70px;
-    height: 70px;
-  }
-}
-
+/* Mobile adjustments */
 @media (max-width: 768px) {
-  .cars-grid {
-    grid-template-columns: 1fr;
-    gap: 1.2rem;
-  }
-
   .car-box {
     padding: 1.6rem 1.3rem;
+    min-height: 320px;
   }
 
   .car-visual {
     height: 130px;
+    margin-bottom: 1.2rem;
   }
 
   .car-visual svg {
@@ -1249,6 +1278,7 @@
 
   .car-box h3 {
     font-size: 1.2rem;
+    padding-bottom: 1rem;
   }
 
   .select-btn {
@@ -1266,10 +1296,12 @@
 @media (max-width: 480px) {
   .car-box {
     padding: 1.4rem 1.2rem;
+    min-height: 300px;
   }
 
   .car-visual {
     height: 120px;
+    margin-bottom: 1rem;
   }
 
   .car-visual svg {
@@ -1279,7 +1311,6 @@
 
   .car-box h3 {
     font-size: 1.1rem;
-    margin-bottom: 1rem;
   }
 
   .select-btn {
@@ -1302,7 +1333,6 @@
     left: 0.8rem;
   }
 }
-
 /* ==================== LEADERBOARD ==================== */
 .leaderboard-list {
   display: flex;
