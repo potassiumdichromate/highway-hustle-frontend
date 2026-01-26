@@ -59,23 +59,6 @@ const getCarName = (index) => {
   return CAR_DATA[index]?.name || 'Unknown';
 };
 
-// Check if car is owned from backend data
-const isCarOwned = (carIndex, playerVehicleData) => {
-  if (!playerVehicleData) return false;
-  
-  // Map backend ownership flags to car indices
-  const ownershipMap = {
-    0: playerVehicleData.CoupeOwned === 1,
-    5: playerVehicleData.PickupOwned === 1,
-    6: playerVehicleData.SUVOwned === 1,
-    8: playerVehicleData.JeepOwned === 1,
-    10: playerVehicleData.LamborghiniOwned === 1,
-    11: playerVehicleData.CTROwned === 1
-  };
-  
-  return ownershipMap[carIndex] || false;
-};
-
 export default function DriverLicense() {
   const { account, disconnectWallet } = useWallet();
   const { logout: privyLogout } = usePrivy();
@@ -619,14 +602,10 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
     }
   };
 
-  // Vehicle stats from backend - UPDATED
+  // Vehicle stats - SIMPLIFIED to just show selected car
+  const selectedCarIndex = playerData?.playerVehicleData?.selectedPlayerCarIndex || 0;
   const vehicleStats = {
-    selected: getCarName(playerData?.playerVehicleData?.selectedPlayerCarIndex),
-    cars: Object.keys(CAR_DATA).map(index => ({
-      index: parseInt(index),
-      name: CAR_DATA[index].name,
-      owned: isCarOwned(parseInt(index), playerData?.playerVehicleData)
-    }))
+    selected: getCarName(selectedCarIndex)
   };
 
   // Calculate level from total score
@@ -725,23 +704,17 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
         </div>
       </div>
 
-      {/* Vehicle Stats - UPDATED */}
+      {/* Vehicle Stats - SIMPLIFIED */}
       <div className="vehicle-section">
         <h3 className="subsection-title">VEHICLE GARAGE</h3>
         <div className="vehicle-card">
           <div className="vehicle-header">
             <Car size={32} />
-            <h4>Current: {vehicleStats.selected}</h4>
+            <h4>Current Vehicle: {vehicleStats.selected}</h4>
           </div>
-          <div className="vehicle-stats-grid">
-            {vehicleStats.cars.map(car => (
-              <VehicleOwnershipBadge 
-                key={car.index}
-                label={car.name} 
-                owned={car.owned} 
-              />
-            ))}
-          </div>
+          <p style={{ textAlign: 'center', marginTop: '1rem', opacity: 0.7 }}>
+            Visit "My Garage" to view all vehicles
+          </p>
         </div>
       </div>
 
@@ -787,19 +760,6 @@ function GameModeCard({ title, icon, stats, iconImage }) {
   );
 }
 
-function VehicleOwnershipBadge({ label, owned }) {
-  return (
-    <div className={`vehicle-ownership-badge ${owned ? 'owned' : 'locked'}`}>
-      <span className="vehicle-name">{label}</span>
-      {owned ? (
-        <span className="ownership-status">✓ Owned</span>
-      ) : (
-        <Lock size={14} />
-      )}
-    </div>
-  );
-}
-
 function StatBox({ icon, label, value }) {
   return (
     <motion.div className="stat-box" whileHover={{ y: -5 }}>
@@ -812,19 +772,20 @@ function StatBox({ icon, label, value }) {
   );
 }
 
-// COMPLETELY UPDATED GarageSection
+// UPDATED GarageSection - ALL CARS SHOW IMAGES, ONLY SELECTED IS EQUIPPED
 function GarageSection({ playerData }) {
   const selectedCarIndex = playerData?.playerVehicleData?.selectedPlayerCarIndex || 0;
 
-  // Build cars array from CAR_DATA
+  console.log('🚗 Selected car index from API:', selectedCarIndex);
+
+  // Build cars array from CAR_DATA - ALL cars available
   const cars = Object.keys(CAR_DATA).map(index => {
     const carIndex = parseInt(index);
     return {
       id: carIndex,
       name: CAR_DATA[carIndex].name,
       image: CAR_DATA[carIndex].image,
-      rarity: CAR_DATA[carIndex].rarity,
-      owned: isCarOwned(carIndex, playerData?.playerVehicleData)
+      rarity: CAR_DATA[carIndex].rarity
     };
   });
 
@@ -832,36 +793,40 @@ function GarageSection({ playerData }) {
     <div className="section">
       <h2 className="section-title">MY GARAGE</h2>
       <div className="cars-grid">
-        {cars.map((car, index) => (
-          <motion.div
-            key={car.id}
-            className={`car-box ${!car.owned ? 'locked' : ''} ${selectedCarIndex === car.id ? 'selected' : ''}`}
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-            whileHover={{ y: car.owned ? -8 : 0 }}
-          >
-            {car.owned && <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>}
-            {selectedCarIndex === car.id && <span className="selected-tag">SELECTED</span>}
-            <div className="car-visual">
-              {car.owned ? (
+        {cars.map((car, index) => {
+          const isSelected = selectedCarIndex === car.id;
+          
+          return (
+            <motion.div
+              key={car.id}
+              className={`car-box ${isSelected ? 'selected' : ''}`}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.1 }}
+              whileHover={{ y: -8 }}
+            >
+              {/* Rarity tag */}
+              <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>
+              
+              {/* Selected tag if this is the equipped car */}
+              {isSelected && <span className="selected-tag">SELECTED</span>}
+              
+              {/* ALWAYS show car image */}
+              <div className="car-visual">
                 <img src={car.image} alt={car.name} className="car-image" />
-              ) : (
-                <Lock size={40} />
-              )}
-            </div>
-            <h3>{car.name}</h3>
-            {car.owned ? (
-              selectedCarIndex === car.id ? (
+              </div>
+              
+              <h3>{car.name}</h3>
+              
+              {/* Button - EQUIPPED if selected, SELECT otherwise */}
+              {isSelected ? (
                 <button className="select-btn active">EQUIPPED</button>
               ) : (
                 <button className="select-btn">SELECT</button>
-              )
-            ) : (
-              <button className="select-btn locked">LOCKED</button>
-            )}
-          </motion.div>
-        ))}
+              )}
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );
