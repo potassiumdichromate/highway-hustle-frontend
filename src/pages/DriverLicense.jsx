@@ -34,14 +34,6 @@ import TwoWayIcon from '../assets/TwoWay.png';
 import SpeedRunIcon from '../assets/SpeedRun.png';
 import TimeBombIcon from '../assets/TimeBomb.png';
 
-// Import game assets
-import CoinIcon from '../assets/coin.png';
-import GameModeIcon from '../assets/gamemode.png';
-import OneWayIcon from '../assets/OneWay.png';
-import TwoWayIcon from '../assets/TwoWay.png';
-import SpeedRunIcon from '../assets/SpeedRun.png';
-import TimeBombIcon from '../assets/TimeBomb.png';
-
 const API_BASE = 'https://highway-hustle-backend.onrender.com/api';
 
 export default function DriverLicense() {
