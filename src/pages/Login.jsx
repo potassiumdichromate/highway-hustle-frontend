@@ -2,11 +2,20 @@ import React, { useEffect, useState } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Zap } from 'lucide-react';
 import SynthwaveBackground from '../components/SynthwaveBackground';
 import LoginModal from '../components/LoginModal';
 import { isSessionActive } from '../lib/authSession';
 import './Login.css';
+
+// Import logos from assets
+import OGPurpleLogo from '../assets/0G-Logo-Purple-Hero.png';
+import KultLogo from '../assets/kult-logo.png';
+import HighwayHustleLogo from '../assets/Highway Hustle Logo.png';
+import OneWayIcon from '../assets/OneWay.png';
+import TwoWayIcon from '../assets/TwoWay.png';
+import SpeedRunIcon from '../assets/SpeedRun.png';
+import TimeBombIcon from '../assets/TimeBomb.png';
+import LeaderboardIcon from '../assets/leaderboard.png';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -98,11 +107,32 @@ export default function Login() {
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.2, duration: 0.6 }}
           >
+            {/* 0G Purple Logo */}
             <div className="logo-container">
-              <Zap className="logo-icon" size={64} />
+              <img 
+                src={OGPurpleLogo} 
+                alt="0G Logo" 
+                className="main-logo"
+              />
             </div>
-            <h1 className="game-title neon-text">HIGHWAY HUSTLE</h1>
-            <p className="game-subtitle">Kult Games</p>
+
+            {/* Highway Hustle Logo */}
+            <div className="highway-logo-container">
+              <img 
+                src={HighwayHustleLogo} 
+                alt="Highway Hustle" 
+                className="highway-logo"
+              />
+            </div>
+
+            {/* Kult Games Logo */}
+            <div className="kult-logo-container">
+              <img 
+                src={KultLogo} 
+                alt="Kult Games" 
+                className="kult-logo"
+              />
+            </div>
           </motion.div>
 
           {/* Login Button */}
@@ -129,16 +159,39 @@ export default function Login() {
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6, duration: 0.8 }}
           >
-            <div className="feature-item">
-              <div className="feature-icon">🏁</div>
-              <h3>4 Game Modes</h3>
-              <p>One Way, Two Way, Timebomb, Sprint</p>
+            {/* 4 Game Modes */}
+            <div className="feature-item large-feature">
+              <h3 className="feature-title">4 Game Modes</h3>
+              <div className="game-modes-showcase">
+                <div className="game-mode-icon-wrapper">
+                  <img src={OneWayIcon} alt="One Way" className="game-mode-icon" />
+                  <span className="mode-label">One Way</span>
+                </div>
+                <div className="game-mode-icon-wrapper">
+                  <img src={TwoWayIcon} alt="Two Way" className="game-mode-icon" />
+                  <span className="mode-label">Two Way</span>
+                </div>
+                <div className="game-mode-icon-wrapper">
+                  <img src={SpeedRunIcon} alt="Speed Run" className="game-mode-icon" />
+                  <span className="mode-label">Speed Run</span>
+                </div>
+                <div className="game-mode-icon-wrapper">
+                  <img src={TimeBombIcon} alt="Time Bomb" className="game-mode-icon" />
+                  <span className="mode-label">Time Bomb</span>
+                </div>
+              </div>
             </div>
+
+            {/* Global Leaderboard */}
             <div className="feature-item">
-              <div className="feature-icon">🏆</div>
+              <div className="feature-icon-img">
+                <img src={LeaderboardIcon} alt="Leaderboard" />
+              </div>
               <h3>Global Leaderboard</h3>
               <p>Compete with drivers worldwide</p>
             </div>
+
+            {/* Car Marketplace */}
             <div className="feature-item">
               <div className="feature-icon">🚗</div>
               <h3>Car Marketplace</h3>
@@ -165,7 +218,7 @@ export default function Login() {
           console.log('[Login] Closing login modal');
           setShowLoginModal(false);
         }}
-        logoSrc=""
+        logoSrc={HighwayHustleLogo}
       />
     </div>
   );
