@@ -1086,6 +1086,7 @@
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.05);
   flex-shrink: 0;
+  padding: 1rem;
 }
 
 .car-visual::before {
@@ -1103,6 +1104,43 @@
   left: 100%;
 }
 
+/* Car image styling */
+.car-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0 15px rgba(0, 212, 255, 0.5));
+  transition: all 0.3s ease;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.car-box:hover .car-image {
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 25px rgba(0, 212, 255, 0.8));
+}
+
+.car-box.selected .car-image {
+  filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.9));
+  animation: pulse-car 2s ease-in-out infinite;
+}
+
+@keyframes pulse-car {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 20px rgba(0, 212, 255, 0.9));
+  }
+  50% {
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 30px rgba(0, 212, 255, 1));
+  }
+}
+
+.car-box.locked .car-image {
+  filter: grayscale(100%) opacity(0.3);
+}
+
+/* SVG lock icon styling (for locked cars) */
 .car-visual svg {
   width: 80px;
   height: 80px;
@@ -1257,6 +1295,7 @@
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
   animation: shine 3s ease-in-out infinite;
   pointer-events: none;
+  z-index: 1;
 }
 
 /* Mobile adjustments */
@@ -1269,6 +1308,12 @@
   .car-visual {
     height: 130px;
     margin-bottom: 1.2rem;
+    padding: 0.8rem;
+  }
+
+  .car-image {
+    max-width: 95%;
+    max-height: 95%;
   }
 
   .car-visual svg {
@@ -1302,6 +1347,12 @@
   .car-visual {
     height: 120px;
     margin-bottom: 1rem;
+    padding: 0.7rem;
+  }
+
+  .car-image {
+    max-width: 90%;
+    max-height: 90%;
   }
 
   .car-visual svg {

@@ -34,7 +34,47 @@ import TwoWayIcon from '../assets/TwoWay.png';
 import SpeedRunIcon from '../assets/SpeedRun.png';
 import TimeBombIcon from '../assets/TimeBomb.png';
 
+// Import car images
+import CoupeImg from '../assets/coupe.png';
+import CTRImg from '../assets/ctr.png';
+import JeepImg from '../assets/jeep.png';
+import PickupImg from '../assets/pickup.png';
+import SUVImg from '../assets/suv.png';
+import LamborghiniImg from '../assets/lamborghini.png';
+
 const API_BASE = 'https://highway-hustle-backend.onrender.com/api';
+
+// Car mapping based on backend indices
+const CAR_DATA = {
+  0: { name: 'Coupe', image: CoupeImg, rarity: 'Common' },
+  5: { name: 'Pickup', image: PickupImg, rarity: 'Common' },
+  6: { name: 'SUV', image: SUVImg, rarity: 'Rare' },
+  8: { name: 'Jeep', image: JeepImg, rarity: 'Epic' },
+  10: { name: 'Lamborghini', image: LamborghiniImg, rarity: 'Legendary' },
+  11: { name: 'CTR', image: CTRImg, rarity: 'Legendary' }
+};
+
+// Get car name from index
+const getCarName = (index) => {
+  return CAR_DATA[index]?.name || 'Unknown';
+};
+
+// Check if car is owned from backend data
+const isCarOwned = (carIndex, playerVehicleData) => {
+  if (!playerVehicleData) return false;
+  
+  // Map backend ownership flags to car indices
+  const ownershipMap = {
+    0: playerVehicleData.CoupeOwned === 1,
+    5: playerVehicleData.PickupOwned === 1,
+    6: playerVehicleData.SUVOwned === 1,
+    8: playerVehicleData.JeepOwned === 1,
+    10: playerVehicleData.LamborghiniOwned === 1,
+    11: playerVehicleData.CTROwned === 1
+  };
+  
+  return ownershipMap[carIndex] || false;
+};
 
 export default function DriverLicense() {
   const { account, disconnectWallet } = useWallet();
@@ -579,14 +619,14 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
     }
   };
 
-  // Vehicle stats from backend
+  // Vehicle stats from backend - UPDATED
   const vehicleStats = {
-    selected: getSelectedCarName(playerData?.playerVehicleData?.selectedPlayerCarIndex),
-    JeepOwned: playerData?.playerVehicleData?.JeepOwned || 0,
-    VanOwned: playerData?.playerVehicleData?.VanOwned || 0,
-    SierraOwned: playerData?.playerVehicleData?.SierraOwned || 0,
-    SedanOwned: playerData?.playerVehicleData?.SedanOwned || 0,
-    LamborghiniOwned: playerData?.playerVehicleData?.LamborghiniOwned || 0
+    selected: getCarName(playerData?.playerVehicleData?.selectedPlayerCarIndex),
+    cars: Object.keys(CAR_DATA).map(index => ({
+      index: parseInt(index),
+      name: CAR_DATA[index].name,
+      owned: isCarOwned(parseInt(index), playerData?.playerVehicleData)
+    }))
   };
 
   // Calculate level from total score
@@ -685,7 +725,7 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
         </div>
       </div>
 
-      {/* Vehicle Stats */}
+      {/* Vehicle Stats - UPDATED */}
       <div className="vehicle-section">
         <h3 className="subsection-title">VEHICLE GARAGE</h3>
         <div className="vehicle-card">
@@ -694,11 +734,13 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
             <h4>Current: {vehicleStats.selected}</h4>
           </div>
           <div className="vehicle-stats-grid">
-            <VehicleOwnershipBadge label="Jeep" owned={vehicleStats.JeepOwned === 1} />
-            <VehicleOwnershipBadge label="Van" owned={vehicleStats.VanOwned === 1} />
-            <VehicleOwnershipBadge label="Sierra" owned={vehicleStats.SierraOwned === 1} />
-            <VehicleOwnershipBadge label="Sedan" owned={vehicleStats.SedanOwned === 1} />
-            <VehicleOwnershipBadge label="Lamborghini" owned={vehicleStats.LamborghiniOwned === 1} />
+            {vehicleStats.cars.map(car => (
+              <VehicleOwnershipBadge 
+                key={car.index}
+                label={car.name} 
+                owned={car.owned} 
+              />
+            ))}
           </div>
         </div>
       </div>
@@ -770,16 +812,21 @@ function StatBox({ icon, label, value }) {
   );
 }
 
+// COMPLETELY UPDATED GarageSection
 function GarageSection({ playerData }) {
-  const cars = [
-    { id: 0, name: 'Jeep', rarity: 'Common', owned: playerData?.playerVehicleData?.JeepOwned === 1 },
-    { id: 1, name: 'Van', rarity: 'Common', owned: playerData?.playerVehicleData?.VanOwned === 1 },
-    { id: 2, name: 'Sierra', rarity: 'Rare', owned: playerData?.playerVehicleData?.SierraOwned === 1 },
-    { id: 3, name: 'Sedan', rarity: 'Epic', owned: playerData?.playerVehicleData?.SedanOwned === 1 },
-    { id: 4, name: 'Lamborghini', rarity: 'Legendary', owned: playerData?.playerVehicleData?.LamborghiniOwned === 1 }
-  ];
-
   const selectedCarIndex = playerData?.playerVehicleData?.selectedPlayerCarIndex || 0;
+
+  // Build cars array from CAR_DATA
+  const cars = Object.keys(CAR_DATA).map(index => {
+    const carIndex = parseInt(index);
+    return {
+      id: carIndex,
+      name: CAR_DATA[carIndex].name,
+      image: CAR_DATA[carIndex].image,
+      rarity: CAR_DATA[carIndex].rarity,
+      owned: isCarOwned(carIndex, playerData?.playerVehicleData)
+    };
+  });
 
   return (
     <div className="section">
@@ -797,7 +844,11 @@ function GarageSection({ playerData }) {
             {car.owned && <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>}
             {selectedCarIndex === car.id && <span className="selected-tag">SELECTED</span>}
             <div className="car-visual">
-              {car.owned ? <Car size={56} /> : <Lock size={40} />}
+              {car.owned ? (
+                <img src={car.image} alt={car.name} className="car-image" />
+              ) : (
+                <Lock size={40} />
+              )}
             </div>
             <h3>{car.name}</h3>
             {car.owned ? (
@@ -977,9 +1028,4 @@ function formatPlayTime(seconds) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${hours}h ${minutes}m`;
-}
-
-function getSelectedCarName(index) {
-  const carNames = ['Jeep', 'Van', 'Sierra', 'Sedan', 'Lamborghini'];
-  return carNames[index] || 'Jeep';
 }
