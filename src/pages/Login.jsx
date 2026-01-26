@@ -8,7 +8,7 @@ import { isSessionActive } from '../lib/authSession';
 import './Login.css';
 
 // Import logos from assets
-import OGPurpleLogo from '../assets/0G-Logo-Purple-Hero.png';
+import OGPurpleLogo from '../assets/oglogo.png';
 import KultLogo from '../assets/kult-logo.png';
 import HighwayHustleLogo from '../assets/Highway Hustle Logo.png';
 import OneWayIcon from '../assets/OneWay.png';
