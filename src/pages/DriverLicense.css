@@ -923,7 +923,6 @@
 
 /* ==================== CAR BOX STYLING ==================== */
 .car-box {
-  /* Remove any flex or width constraints */
   width: 100%;
   padding: 2rem 1.8rem;
   background: rgba(0, 0, 0, 0.6);
@@ -935,7 +934,6 @@
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
   overflow: hidden;
-  /* Ensure consistent height */
   display: flex;
   flex-direction: column;
   min-height: 350px;
@@ -973,24 +971,7 @@
     0 0 0 1px rgba(0, 212, 255, 0.1) inset;
 }
 
-.car-box.locked {
-  opacity: 0.6;
-  cursor: not-allowed;
-  border-style: dashed;
-  border-color: rgba(128, 128, 128, 0.3);
-  background: rgba(0, 0, 0, 0.4);
-}
-
-.car-box.locked::before {
-  display: none;
-}
-
-.car-box.locked:hover {
-  transform: none;
-  box-shadow: none;
-  border-color: rgba(128, 128, 128, 0.3);
-}
-
+/* Selected car state */
 .car-box.selected {
   border-color: #00d4ff;
   border-width: 3px;
@@ -1010,6 +991,7 @@
   bottom: 0;
   background: radial-gradient(circle at 50% 0%, rgba(0, 212, 255, 0.1), transparent 70%);
   pointer-events: none;
+  z-index: 0;
 }
 
 /* Tags positioning */
@@ -1098,6 +1080,7 @@
   height: 100%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
   transition: left 0.6s ease;
+  z-index: 1;
 }
 
 .car-box:hover .car-visual::before {
@@ -1113,6 +1096,8 @@
   transition: all 0.3s ease;
   max-width: 100%;
   max-height: 100%;
+  position: relative;
+  z-index: 2;
 }
 
 .car-box:hover .car-image {
@@ -1136,34 +1121,6 @@
   }
 }
 
-.car-box.locked .car-image {
-  filter: grayscale(100%) opacity(0.3);
-}
-
-/* SVG lock icon styling (for locked cars) */
-.car-visual svg {
-  width: 80px;
-  height: 80px;
-  color: rgba(0, 212, 255, 0.7);
-  filter: drop-shadow(0 0 15px rgba(0, 212, 255, 0.5));
-  transition: all 0.3s ease;
-}
-
-.car-box:hover .car-visual svg {
-  transform: scale(1.15);
-  color: rgba(0, 212, 255, 1);
-  filter: drop-shadow(0 0 25px rgba(0, 212, 255, 0.8));
-}
-
-.car-box.locked .car-visual {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.car-box.locked .car-visual svg {
-  color: rgba(128, 128, 128, 0.5);
-  filter: none;
-}
-
 /* Car name */
 .car-box h3 {
   font-family: var(--font-display);
@@ -1175,6 +1132,7 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   position: relative;
+  z-index: 2;
 }
 
 .car-box h3::after {
@@ -1213,6 +1171,7 @@
   overflow: hidden;
   margin-top: auto;
   flex-shrink: 0;
+  z-index: 2;
 }
 
 .select-btn::before {
@@ -1247,6 +1206,7 @@
   z-index: 1;
 }
 
+/* EQUIPPED button state */
 .select-btn.active {
   background: linear-gradient(135deg, #00d4ff, #00a8cc);
   border-color: #00d4ff;
@@ -1262,20 +1222,11 @@
   transform: none;
 }
 
-.select-btn.locked {
-  opacity: 0.4;
-  cursor: not-allowed;
-  background: rgba(128, 128, 128, 0.1);
-  border-color: rgba(128, 128, 128, 0.3);
-  color: rgba(255, 255, 255, 0.4);
+.select-btn.active::before {
+  display: none;
 }
 
-.select-btn.locked:hover {
-  transform: none;
-  box-shadow: none;
-}
-
-/* Add shine effect to unlocked cars */
+/* Shine effect on all cars */
 @keyframes shine {
   0% {
     left: -100%;
@@ -1285,7 +1236,7 @@
   }
 }
 
-.car-box:not(.locked)::after {
+.car-box::after {
   content: '';
   position: absolute;
   top: 0;
@@ -1296,6 +1247,12 @@
   animation: shine 3s ease-in-out infinite;
   pointer-events: none;
   z-index: 1;
+}
+
+/* Don't animate shine on selected car (already has radial gradient) */
+.car-box.selected::after {
+  animation: none;
+  background: radial-gradient(circle at 50% 0%, rgba(0, 212, 255, 0.1), transparent 70%);
 }
 
 /* Mobile adjustments */
@@ -1314,11 +1271,6 @@
   .car-image {
     max-width: 95%;
     max-height: 95%;
-  }
-
-  .car-visual svg {
-    width: 65px;
-    height: 65px;
   }
 
   .car-box h3 {
@@ -1353,11 +1305,6 @@
   .car-image {
     max-width: 90%;
     max-height: 90%;
-  }
-
-  .car-visual svg {
-    width: 60px;
-    height: 60px;
   }
 
   .car-box h3 {
