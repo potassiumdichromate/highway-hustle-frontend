@@ -941,7 +941,7 @@ function LeaderboardSection({
   const hasEntries = transformedLeaderboard.length > 0;
 
   return (
-    <div className="section">
+    <div className="section" style={{minHeight:'75vh'}}>
       <h2 className="section-title">{title}</h2>
       <p className="section-subtitle">{subtitle}</p>
       <div className="leaderboard-tabs">
