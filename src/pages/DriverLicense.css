@@ -173,7 +173,12 @@
   z-index: 10;
 }
 
-/* ==================== SIDEBAR ==================== */
+/* ==========================================
+   MOBILE RESPONSIVE NAVIGATION FIX
+   Add this to your DriverLicense.css to replace the sidebar section
+   ========================================== */
+
+/* ==================== SIDEBAR - DESKTOP ==================== */
 .sidebar {
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(15px);
@@ -209,6 +214,7 @@
   transition: all 0.25s ease;
   position: relative;
   overflow: hidden;
+  white-space: nowrap;
 }
 
 .nav-btn::before {
@@ -241,100 +247,280 @@
   transform: translateX(0);
 }
 
-.garage-btn {
-  width: 100%;
-  padding: 1rem;
-  margin-bottom: 0.8rem;
-  background: rgba(0, 212, 255, 0.15);
-  border: 2px solid rgba(0, 212, 255, 0.4);
-  border-radius: 10px;
-  color: #00d4ff;
-  font-family: var(--font-display);
-  font-size: 0.9rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.6rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
+/* ==================== MOBILE NAVIGATION (Tablet and below) ==================== */
+
+/* Tablet Landscape - 1024px */
+@media (max-width: 1024px) {
+  .sidebar {
+    position: sticky;
+    top: 60px;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0.8rem;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    z-index: 90;
+  }
+
+  .sidebar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-menu {
+    flex-direction: row;
+    flex: 1;
+    gap: 0.5rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .nav-menu::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-btn {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    min-width: fit-content;
+  }
+
+  .nav-btn span {
+    display: inline;
+  }
+
+  /* Hide label text, show only icons on smaller tablets */
+  @media (max-width: 900px) {
+    .nav-btn span {
+      display: none;
+    }
+
+    .nav-btn.active span {
+      display: inline;
+    }
+
+    .nav-btn {
+      padding: 0.75rem;
+      justify-content: center;
+    }
+
+    .nav-btn.active {
+      padding: 0.75rem 1rem;
+    }
+  }
+
+  .garage-btn {
+    flex-shrink: 0;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    width: auto;
+    margin-bottom: 0;
+    white-space: nowrap;
+  }
+
+  .play-btn {
+    flex-shrink: 0;
+    margin-top: 0;
+    width: auto;
+    white-space: nowrap;
+  }
+
+  .play-btn-content {
+    padding: 0.85rem 1rem;
+  }
+
+  .play-btn-sub {
+    display: none;
+  }
 }
 
-.garage-btn:hover {
-  background: rgba(0, 212, 255, 0.25);
-  border-color: #00d4ff;
-  box-shadow: 0 0 20px rgba(0, 212, 255, 0.4);
+/* Tablet Portrait - 768px */
+@media (max-width: 768px) {
+  .sidebar {
+    padding: 0.7rem;
+    gap: 0.5rem;
+  }
+
+  .nav-btn {
+    padding: 0.7rem;
+  }
+
+  .nav-btn span {
+    display: none;
+  }
+
+  .nav-btn.active span {
+    display: inline;
+    font-size: 0.8rem;
+  }
+
+  .nav-btn.active {
+    padding: 0.7rem 0.9rem;
+  }
+
+  .garage-btn {
+    padding: 0.7rem 0.9rem;
+    font-size: 0.8rem;
+  }
+
+  .garage-btn span {
+    display: none;
+  }
+
+  .play-btn-content {
+    padding: 0.8rem;
+    gap: 0.6rem;
+  }
+
+  .play-btn-main {
+    font-size: 0.85rem;
+  }
 }
 
-.play-btn {
-  margin-top: auto;
-  padding: 0;
-  position: relative;
-  background: linear-gradient(135deg, #ff006e, #7209b7, #00d4ff);
-  border: none;
-  border-radius: 12px;
-  color: #fff;
-  font-family: var(--font-display);
-  cursor: pointer;
-  overflow: hidden;
-  box-shadow: 
-    0 6px 25px rgba(255, 0, 110, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+/* Mobile - 480px */
+@media (max-width: 480px) {
+  .sidebar {
+    padding: 0.6rem 0.5rem;
+    gap: 0.4rem;
+  }
+
+  .nav-btn {
+    padding: 0.65rem;
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .nav-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .nav-btn.active {
+    padding: 0.65rem 0.8rem;
+  }
+
+  .nav-btn.active span {
+    font-size: 0.75rem;
+  }
+
+  .garage-btn {
+    padding: 0.65rem;
+    min-width: 44px;
+  }
+
+  .garage-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .play-btn-content {
+    padding: 0.7rem;
+  }
+
+  .play-btn-main {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+  }
+
+  .play-btn svg {
+    width: 20px;
+    height: 20px;
+  }
 }
 
-.play-btn-content {
-  position: relative;
-  z-index: 2;
-  padding: 1.3rem 1.2rem;
-  display: flex;
-  align-items: center;
-  gap: 0.9rem;
+/* Small Mobile - 360px */
+@media (max-width: 360px) {
+  .sidebar {
+    padding: 0.5rem 0.4rem;
+    gap: 0.3rem;
+  }
+
+  .nav-btn {
+    padding: 0.6rem;
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  .nav-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .nav-btn.active {
+    padding: 0.6rem 0.7rem;
+  }
+
+  .nav-btn.active span {
+    font-size: 0.7rem;
+  }
+
+  .garage-btn {
+    padding: 0.6rem;
+    min-width: 40px;
+  }
+
+  .garage-btn svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .play-btn-content {
+    padding: 0.65rem;
+  }
+
+  .play-btn-main {
+    font-size: 0.75rem;
+  }
+
+  .play-btn svg {
+    width: 18px;
+    height: 18px;
+  }
 }
 
-.play-btn-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  text-align: left;
+/* Add horizontal scroll indicator hint */
+@media (max-width: 1024px) {
+  .sidebar::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    background: linear-gradient(to left, rgba(0, 0, 0, 0.8), transparent);
+    pointer-events: none;
+  }
+
+  .sidebar::-webkit-scrollbar {
+    height: 0;
+  }
 }
 
-.play-btn-main {
-  font-size: 1rem;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-  line-height: 1;
-}
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .nav-btn,
+  .garage-btn,
+  .play-btn {
+    min-height: 44px;
+    min-width: 44px;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-.play-btn-sub {
-  font-size: 0.7rem;
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  opacity: 0.85;
-  margin-top: 0.3rem;
-}
+  .sidebar {
+    overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity;
+  }
 
-.play-btn-glow {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.3), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
-
-.play-btn:hover .play-btn-glow {
-  opacity: 1;
-}
-
-.play-btn:hover {
-  box-shadow: 
-    0 8px 35px rgba(255, 0, 110, 0.6),
-    0 0 50px rgba(0, 212, 255, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  .nav-btn {
+    scroll-snap-align: start;
+  }
 }
 
 /* ==================== CONTENT AREA ==================== */
