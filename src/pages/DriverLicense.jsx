@@ -42,7 +42,8 @@ import PickupImg from '../assets/pickup.png';
 import SUVImg from '../assets/suv.png';
 import LamborghiniImg from '../assets/lamborghini.png';
 
-const API_BASE = 'https://highway-hustle-backend.onrender.com/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-backend.onrender.com/api';
+
 
 // Car mapping based on backend indices
 const CAR_DATA = {
@@ -78,8 +79,10 @@ export default function DriverLicense() {
   // Backend data state
   const [playerData, setPlayerData] = useState(null);
   const [leaderboardData, setLeaderboardData] = useState(null);
+  const [leaderboardType, setLeaderboardType] = useState('global');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
   // Get wallet address
   const walletAddress = account || localStorage.getItem('walletAddress');
@@ -88,9 +91,14 @@ export default function DriverLicense() {
   useEffect(() => {
     if (walletAddress) {
       loadPlayerData();
-      loadLeaderboard();
     }
   }, [walletAddress]);
+
+  useEffect(() => {
+    if (walletAddress) {
+      loadLeaderboard(leaderboardType);
+    }
+  }, [walletAddress, leaderboardType]);
 
   const loadPlayerData = async () => {
     try {
@@ -112,25 +120,34 @@ export default function DriverLicense() {
     }
   };
 
-  const loadLeaderboard = async () => {
+  const loadLeaderboard = async (type = leaderboardType) => {
     try {
+      setLeaderboardLoading(true);
       const timestamp = Date.now();
-      const response = await fetch(`${API_BASE}/leaderboard?t=${timestamp}`);
+      const endpoint =
+        type === 'gate'
+          ? `${API_BASE}/leaderboard/gate-wallet`
+          : `${API_BASE}/leaderboard`;
+      const response = await fetch(`${endpoint}?t=${timestamp}`);
       const data = await response.json();
       
       if (data.success) {
         setLeaderboardData(data.leaderboard);
-        console.log('✅ Leaderboard loaded');
+        console.log(`✅ ${type === 'gate' ? 'Gate wallet' : 'Global'} leaderboard loaded`);
+      } else {
+        console.error(`❌ Failed to load ${type} leaderboard`);
       }
     } catch (error) {
-      console.error('❌ Error loading leaderboard:', error);
+      console.error(`❌ Error loading ${type} leaderboard:`, error);
+    } finally {
+      setLeaderboardLoading(false);
     }
   };
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await loadPlayerData();
-    await loadLeaderboard();
+    await loadLeaderboard(leaderboardType);
     setIsRefreshing(false);
   };
 
@@ -215,6 +232,9 @@ export default function DriverLicense() {
             setSelectedGameMode={setSelectedGameMode}
             leaderboardData={leaderboardData}
             playerData={playerData}
+            leaderboardType={leaderboardType}
+            onLeaderboardTypeChange={setLeaderboardType}
+            isLoading={leaderboardLoading}
           />
         );
       case 'marketplace':
@@ -832,25 +852,61 @@ function GarageSection({ playerData }) {
   );
 }
 
-function LeaderboardSection({ selectedGameMode, setSelectedGameMode, leaderboardData, playerData }) {
-  // Transform backend leaderboard data
+function LeaderboardSection({
+  selectedGameMode,
+  setSelectedGameMode,
+  leaderboardData,
+  playerData,
+  leaderboardType,
+  onLeaderboardTypeChange,
+  isLoading
+}) {
+  const tabs = [
+    { key: 'global', label: 'Global Leaderboard', help: 'Top Highway Hustle players' },
+    { key: 'gate', label: 'Gate Wallet Leaderboard', help: 'Only gate_wallet sign-ins' }
+  ];
+  const title = leaderboardType === 'gate' ? 'Gate Wallet Leaderboard' : 'Global Leaderboard';
+  const subtitle =
+    leaderboardType === 'gate'
+      ? 'Gate wallet users ranked by Highway Coins'
+      : 'Top players by Highway Coins';
   const transformedLeaderboard = leaderboardData?.slice(0, 10).map((player, index) => ({
     rank: index + 1,
     player: player.userGameData?.playerName || 'Unnamed',
     score: player.userGameData?.currency || 0,
-    address: player.privyData?.walletAddress?.slice(0, 6) + '...' + player.privyData?.walletAddress?.slice(-4)
+    address: player.privyData?.walletAddress
+      ? `${player.privyData.walletAddress.slice(0, 6)}...${player.privyData.walletAddress.slice(-4)}`
+      : player.privyData?.discord || player.privyData?.email || 'Unknown'
   })) || [];
+  const hasEntries = transformedLeaderboard.length > 0;
 
   return (
     <div className="section">
-      <h2 className="section-title">GLOBAL LEADERBOARD</h2>
-      <p className="section-subtitle">Top players by Highway Coins</p>
+      <h2 className="section-title">{title}</h2>
+      <p className="section-subtitle">{subtitle}</p>
+      <div className="leaderboard-tabs">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            className={`leaderboard-tab ${leaderboardType === tab.key ? 'active' : ''}`}
+            onClick={() => onLeaderboardTypeChange(tab.key)}
+          >
+            <span>{tab.label}</span>
+            <small>{tab.help}</small>
+          </button>
+        ))}
+      </div>
 
       <div className="leaderboard-list">
-        {transformedLeaderboard.length > 0 ? (
+        {isLoading ? (
+          <div className="no-data">
+            <p>Loading leaderboard...</p>
+          </div>
+        ) : hasEntries ? (
           transformedLeaderboard.map((entry, index) => (
             <motion.div
-              key={entry.rank}
+              key={`${leaderboardType}-${entry.rank}`}
               className={`lb-entry rank-${entry.rank}`}
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
@@ -869,7 +925,7 @@ function LeaderboardSection({ selectedGameMode, setSelectedGameMode, leaderboard
           ))
         ) : (
           <div className="no-data">
-            <p>Loading leaderboard...</p>
+            <p>No entries available for this leaderboard yet.</p>
           </div>
         )}
       </div>
