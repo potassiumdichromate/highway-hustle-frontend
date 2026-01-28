@@ -6,7 +6,7 @@ import { clearAuthSession } from '../lib/authSession';
 
 // API interceptor - adjust based on your actual implementation
 const apiInterceptor = async (config) => {
-  const baseURL = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-backend.onrender.com/api';
+  const baseURL =  'https://highway-hustle-backend.onrender.com/api';
   const url = `${baseURL}${config.url}`;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;

@@ -377,8 +377,8 @@ const styles = {
   },
 };
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+const API_BASE_URL = 'https://highway-hustle-backend.onrender.com/api';
+  // import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 const recordPrivyLogin = async ({ identifier, privyMetaData = {} }) => {
   if (!identifier) return;
@@ -398,6 +398,7 @@ const recordPrivyLogin = async ({ identifier, privyMetaData = {} }) => {
 
     console.log('[LoginModal] Privy login recorded', {
       identifier,
+      recordedAt: payload.data?.recordedAt,
     });
   } catch (err) {
     console.error('[LoginModal] Failed to record privy login metadata', err);
@@ -709,16 +710,6 @@ function getDiscordIdentifier(accounts) {
   return discordAccount ? getLinkedAccountIdentifier(discordAccount) : '';
 }
 
-function findConnectionCandidateByKeywords(candidates, keywords = []) {
-  if (!Array.isArray(candidates) || !keywords.length) return null;
-  const lowered = (value) => (typeof value === 'string' ? value.toLowerCase() : '');
-  return candidates.find((candidate) => {
-    const type = lowered(candidate?.type);
-    const provider = lowered(candidate?.providerName);
-    return keywords.some((keyword) => type.includes(keyword) || provider.includes(keyword));
-  });
-}
-
 function LoginModal({ open, onClose, logoSrc }) {
   const navigate = useNavigate();
   const dialogRef = useRef(null);
@@ -925,15 +916,6 @@ function LoginModal({ open, onClose, logoSrc }) {
       ? normalizedConnections
       : normalizeLinkedAccounts(activeUser?.linkedAccounts);
 
-    const discordConnection = findConnectionCandidateByKeywords(normalizedConnections, [
-      'discord',
-    ]);
-    const telegramConnection = findConnectionCandidateByKeywords(normalizedConnections, [
-      'telegram',
-    ]);
-    const discordId = discordConnection?.identifier || '';
-    const telegramIdentifier = telegramConnection?.identifier || '';
-
     const session = {
       source: source || 'privy',
       loginType: resolvedLoginType,
@@ -952,33 +934,22 @@ function LoginModal({ open, onClose, logoSrc }) {
       timestamp: new Date().toISOString(),
     };
 
-    const derivePrivyType = () => {
-      if (discordId) return 'discordId';
-      if (telegramIdentifier) return 'telegram';
-      if (resolvedWalletAddress) return 'walletAddress';
-      if (resolvedEmail) return 'email';
-      if (resolvedDiscord) return 'discord';
-      return resolvedLoginType || 'unknown';
-    };
-
     const privyMetaData = {
       address: resolvedWalletAddress,
       discord: resolvedDiscord,
       email: resolvedEmail,
-      type: derivePrivyType(),
+      type: resolvedLoginType,
       privyUserId: resolvedUserId,
-    chainId:
-      wallet?.chainId ||
-      user?.wallet?.chainId ||
-      primaryConnectionCandidate?.chainId ||
-      '',
-    providerName:
-      primaryConnectionCandidate?.providerName ||
-      primaryConnectionCandidate?.provider ||
-      '',
-    discordId,
-    telegram: telegramIdentifier,
-  };
+      chainId:
+        wallet?.chainId ||
+        user?.wallet?.chainId ||
+        primaryConnectionCandidate?.chainId ||
+        '',
+      providerName:
+        primaryConnectionCandidate?.providerName ||
+        primaryConnectionCandidate?.provider ||
+        '',
+    };
 
     console.log('[LoginModal] Resolved session fields', {
       resolvedWalletAddress: summarizeAddress(resolvedWalletAddress),
