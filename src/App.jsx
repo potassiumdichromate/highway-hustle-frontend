@@ -8,6 +8,27 @@ import Game from './pages/Game';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
+// Resolve and store the visitor's region/country for telemetry and UX tweaks
+const resolveAndStoreRegion = async () => {
+  if (typeof window === 'undefined') return;
+  try {
+    const res = await fetch('https://ipapi.co/json/');
+    if (!res.ok) return;
+    const geo = await res.json();
+    const region =
+      geo?.country_name ||
+      geo?.region ||
+      geo?.country ||
+      geo?.continent_code ||
+      '';
+    if (region) {
+      localStorage.setItem('region', region);
+    }
+  } catch (err) {
+    console.warn('[App] Unable to resolve region info', err);
+  }
+};
+
 const zeroGChain = {
   id: 16661,
   name: '0G Mainnet',
@@ -23,6 +44,9 @@ const zeroGChain = {
 
 function AppContent() {
   useEffect(() => {
+    // Capture region on app load/refresh
+    resolveAndStoreRegion();
+
     // Mobile viewport height fix for iOS
     const setViewportHeight = () => {
       const vh = window.innerHeight * 0.01;
