@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Maximize, Minimize } from 'lucide-react';
-import { useBlockchainToast } from '../context/BlockchainToastContext'; // ADD THIS
+import { useBlockchainToast } from '../context/BlockchainToastContext';
 import UNITY_BUILDS from '../config/unityBuilds';
 import './Game.css';
 
@@ -11,10 +11,11 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-ba
 export default function Game() {
   const { gameMode } = useParams();
   const navigate = useNavigate();
-  const { showToast } = useBlockchainToast(); // ADD THIS HOOK
+  const { showToast } = useBlockchainToast();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [walletAddress, setWalletAddress] = useState(null);
+  const [hasCalledApi, setHasCalledApi] = useState(false); // Track if API was called
 
   const gameModeNames = {
     oneWay: 'One Way',
@@ -32,45 +33,87 @@ export default function Game() {
       setWalletAddress(wallet);
     } else {
       console.warn('⚠️ No wallet address found in localStorage');
+      navigate('/license'); // Redirect if no wallet
     }
-  }, []);
+  }, [navigate]);
 
-  // NEW: Load player data and show blockchain toast when game starts
+  // Call API when wallet address is available (game starts)
   useEffect(() => {
-    if (walletAddress) {
-      loadPlayerDataAndShowToast();
+    if (walletAddress && !hasCalledApi) {
+      console.log('🎮 Game starting - calling API...');
+      callGameStartApi();
+      setHasCalledApi(true);
     }
-  }, [walletAddress]);
+  }, [walletAddress, hasCalledApi]);
 
-  const loadPlayerDataAndShowToast = async () => {
+  const callGameStartApi = async () => {
     try {
       const timestamp = Date.now();
-      const response = await fetch(`${API_BASE}/player/all?user=${walletAddress}&t=${timestamp}`);
+      const apiUrl = `${API_BASE}/player/all?user=${walletAddress}&t=${timestamp}`;
+      
+      console.log('📡 Calling API:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
+      
       const data = await response.json();
       
+      console.log('✅ API Response:', data);
+      
       if (data.success) {
-        console.log('✅ Player data loaded for game:', data.data);
-        
-        // Show toast if blockchain session was recorded
+        // Show toast based on blockchain response
         if (data.blockchain?.success && data.blockchain?.txHash) {
+          console.log('🔗 Blockchain transaction successful:', data.blockchain.txHash);
+          
           showToast({
             title: '🎮 Game Session Started',
-            description: `Playing ${gameModeNames[gameMode]} - Session tracked on blockchain`,
+            description: `Playing ${gameModeNames[gameMode]} - Session recorded on blockchain`,
             txHash: data.blockchain.txHash,
             duration: 6000
           });
         } else if (data.blockchain) {
-          // Blockchain recording attempted but failed
+          console.log('⚠️ Blockchain recording attempted but failed:', data.blockchain.error);
+          
           showToast({
             title: '🎮 Game Session Started',
             description: `Playing ${gameModeNames[gameMode]}`,
             txHash: null,
             duration: 5000
           });
+        } else {
+          console.log('ℹ️ No blockchain data in response');
+          
+          showToast({
+            title: '🎮 Game Session Started',
+            description: `Playing ${gameModeNames[gameMode]}`,
+            txHash: null,
+            duration: 4000
+          });
         }
+      } else {
+        console.error('❌ API call failed:', data.error);
+        
+        showToast({
+          title: '⚠️ Session Warning',
+          description: 'Could not record game session',
+          txHash: null,
+          duration: 4000
+        });
       }
     } catch (error) {
-      console.error('❌ Error loading player data:', error);
+      console.error('❌ Error calling game start API:', error);
+      
+      showToast({
+        title: '❌ Connection Error',
+        description: 'Failed to connect to server',
+        txHash: null,
+        duration: 4000
+      });
     }
   };
 
@@ -97,7 +140,6 @@ export default function Game() {
   };
 
   useEffect(() => {
-    // Loading will be handled by iframe onLoad
     setIsLoading(true);
   }, [gameMode, walletAddress]);
 
@@ -141,73 +183,6 @@ export default function Game() {
     };
   }, []);
 
-  // NEW: Listen for messages from Unity game
-  useEffect(() => {
-    const handleUnityMessage = (event) => {
-      // Verify origin for security (replace with your Unity build domain)
-      // if (event.origin !== 'https://your-unity-build-domain.com') return;
-      
-      try {
-        const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
-        
-        // Handle blockchain events from Unity
-        if (message.type === 'BLOCKCHAIN_EVENT') {
-          console.log('🎮 Unity blockchain event:', message);
-          
-          switch (message.action) {
-            case 'SCORE_UPDATED':
-              showToast({
-                title: '🏆 Score Updated',
-                description: `New high score: ${message.score}`,
-                txHash: message.txHash || null,
-                duration: 5000
-              });
-              break;
-              
-            case 'CURRENCY_EARNED':
-              showToast({
-                title: '💰 Coins Earned',
-                description: `Earned ${message.amount} Highway Coins`,
-                txHash: message.txHash || null,
-                duration: 5000
-              });
-              break;
-              
-            case 'ACHIEVEMENT_UNLOCKED':
-              showToast({
-                title: '🎖️ Achievement Unlocked',
-                description: message.achievementName || 'New achievement!',
-                txHash: message.txHash || null,
-                duration: 7000
-              });
-              break;
-              
-            case 'SESSION_ENDED':
-              showToast({
-                title: '🏁 Game Session Ended',
-                description: 'Session data recorded on blockchain',
-                txHash: message.txHash || null,
-                duration: 6000
-              });
-              break;
-              
-            default:
-              console.log('Unknown blockchain event:', message.action);
-          }
-        }
-      } catch (error) {
-        console.error('Error handling Unity message:', error);
-      }
-    };
-
-    window.addEventListener('message', handleUnityMessage);
-    
-    return () => {
-      window.removeEventListener('message', handleUnityMessage);
-    };
-  }, [showToast, gameModeNames, gameMode]);
-
-  // Don't render iframe until we have wallet address
   const unityUrl = getUnityBuildUrl();
   const canLoadGame = walletAddress && unityUrl;
 
@@ -263,7 +238,10 @@ export default function Game() {
             title={`Highway Hustle - ${gameModeNames[gameMode]}`}
             className="unity-game-iframe"
             allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer"
-            onLoad={() => setIsLoading(false)}
+            onLoad={() => {
+              console.log('🎮 Unity game loaded');
+              setIsLoading(false);
+            }}
           />
         )}
       </div>
