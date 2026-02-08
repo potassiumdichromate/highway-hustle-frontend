@@ -3,6 +3,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useWallet } from '../context/WalletContext';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useBlockchainToast } from '../context/BlockchainToastContext'; // NEW IMPORT
 import {
   User,
   Car,
@@ -44,7 +45,6 @@ import LamborghiniImg from '../assets/lamborghini.png';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-backend.onrender.com/api';
 
-
 // Car mapping based on backend indices
 const CAR_DATA = {
   0: { name: 'Coupe', image: CoupeImg, rarity: 'Common' },
@@ -63,6 +63,7 @@ const getCarName = (index) => {
 export default function DriverLicense() {
   const { account, disconnectWallet } = useWallet();
   const { logout: privyLogout } = usePrivy();
+  const { showToast } = useBlockchainToast(); // NEW HOOK
   const navigate = useNavigate();
   
   // State management
@@ -110,6 +111,16 @@ export default function DriverLicense() {
       if (data.success) {
         setPlayerData(data.data);
         console.log('✅ Player data loaded:', data.data);
+        
+        // NEW: Show toast if session was recorded on blockchain
+        if (data.blockchain?.txHash) {
+          showToast({
+            title: '📊 Session Recorded',
+            description: 'Your game session was tracked on blockchain',
+            txHash: data.blockchain.txHash,
+            duration: 5000
+          });
+        }
       } else {
         console.error('❌ Failed to load player data');
       }
@@ -418,7 +429,6 @@ export default function DriverLicense() {
 
 // Garage Modal Component
 function GarageModal({ onClose, walletAddress }) {
-  // Update with your actual R2 garage URL
   const garageUrl = `https://your-r2-bucket.r2.dev/Garage/index.html?wallet=${walletAddress}`;
 
   return (
@@ -550,12 +560,12 @@ function GameModeSelector({ onClose }) {
 
 // Section Components
 function OverviewSection({ playerData, walletAddress, onRefresh }) {
+  const { showToast } = useBlockchainToast(); // NEW HOOK
   const [isEditingName, setIsEditingName] = useState(false);
   const [displayName, setDisplayName] = useState(playerData?.userGameData?.playerName || 'Unnamed');
   const [tempName, setTempName] = useState(displayName);
   const [isSavingName, setIsSavingName] = useState(false);
 
-  // Update display name when playerData changes
   useEffect(() => {
     if (playerData?.userGameData?.playerName) {
       setDisplayName(playerData.userGameData.playerName);
@@ -583,7 +593,16 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
         setDisplayName(tempName);
         setIsEditingName(false);
         console.log('✅ Player name updated');
-        onRefresh(); // Refresh data
+        
+        // NEW: Show toast notification
+        showToast({
+          title: '✏️ Name Updated',
+          description: `Player name changed to "${tempName}"`,
+          txHash: data.blockchain?.txHash || null,
+          duration: 4000
+        });
+        
+        onRefresh();
       }
     } catch (error) {
       console.error('❌ Error updating player name:', error);
@@ -622,13 +641,11 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
     }
   };
 
-  // Vehicle stats - SIMPLIFIED to just show selected car
   const selectedCarIndex = playerData?.playerVehicleData?.selectedPlayerCarIndex || 0;
   const vehicleStats = {
     selected: getCarName(selectedCarIndex)
   };
 
-  // Calculate level from total score
   const level = Math.floor(stats.totalScore / 1000) + 1;
 
   return (
@@ -724,7 +741,7 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
         </div>
       </div>
 
-      {/* Vehicle Stats - SIMPLIFIED */}
+      {/* Vehicle Stats */}
       <div className="vehicle-section">
         <h3 className="subsection-title">VEHICLE GARAGE</h3>
         <div className="vehicle-card">
@@ -792,27 +809,24 @@ function StatBox({ icon, label, value }) {
   );
 }
 
-// UPDATED GarageSection - ALL CARS SHOW IMAGES, ONLY SELECTED IS EQUIPPED
+// UPDATED GarageSection with blockchain toast
 function GarageSection({ playerData }) {
+  const { showToast } = useBlockchainToast(); // NEW HOOK
   const [selectedCarIndex, setSelectedCarIndex] = useState(playerData?.playerVehicleData?.selectedPlayerCarIndex || 0);
   const [isSelecting, setIsSelecting] = useState(false);
   
-  // Get wallet address from localStorage
   const walletAddress = localStorage.getItem('walletAddress');
 
-  console.log('🚗 Selected car index from API:', selectedCarIndex);
-
-  // Update selectedCarIndex when playerData changes
   useEffect(() => {
     if (playerData?.playerVehicleData?.selectedPlayerCarIndex !== undefined) {
       setSelectedCarIndex(playerData.playerVehicleData.selectedPlayerCarIndex);
     }
   }, [playerData]);
 
-  // Handle car selection
+  // UPDATED: Handle car selection with toast
   const handleSelectCar = async (carIndex) => {
     if (carIndex === selectedCarIndex || isSelecting) {
-      return; // Already selected or currently selecting
+      return;
     }
 
     setIsSelecting(true);
@@ -834,8 +848,13 @@ function GarageSection({ playerData }) {
         setSelectedCarIndex(carIndex);
         console.log(`✅ Car selected successfully: ${CAR_DATA[carIndex].name} (index ${carIndex})`);
         
-        // Optional: Show success message
-        // You can add a toast notification here if you want
+        // NEW: Show toast notification with blockchain data
+        showToast({
+          title: '🚗 Vehicle Switched',
+          description: `Equipped ${CAR_DATA[carIndex].name}`,
+          txHash: data.blockchain?.txHash || null,
+          duration: 6000
+        });
       } else {
         console.error('❌ Failed to select car:', data);
         alert('Failed to select car. Please try again.');
@@ -848,7 +867,6 @@ function GarageSection({ playerData }) {
     }
   };
 
-  // Build cars array from CAR_DATA - ALL cars available
   const cars = Object.keys(CAR_DATA).map(index => {
     const carIndex = parseInt(index);
     return {
@@ -877,20 +895,15 @@ function GarageSection({ playerData }) {
               transition={{ delay: index * 0.1 }}
               whileHover={{ y: isSelected ? 0 : -8 }}
             >
-              {/* Rarity tag */}
               <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>
-              
-              {/* Selected tag if this is the equipped car */}
               {isSelected && <span className="selected-tag">SELECTED</span>}
               
-              {/* ALWAYS show car image */}
               <div className="car-visual">
                 <img src={car.image} alt={car.name} className="car-image" />
               </div>
               
               <h3>{car.name}</h3>
               
-              {/* Button - EQUIPPED if selected, SELECT with click handler otherwise */}
               {isSelected ? (
                 <button className="select-btn active" disabled>
                   EQUIPPED
@@ -1104,7 +1117,6 @@ function ChatSection({ messages }) {
   );
 }
 
-// Helper Functions
 function formatPlayTime(seconds) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);

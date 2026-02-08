@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { PrivyProvider } from '@privy-io/react-auth';
 import { WalletProvider } from './context/WalletContext';
+import { BlockchainToastProvider } from './context/BlockchainToastContext'; // NEW
 import Login from './pages/Login';
 import DriverLicense from './pages/DriverLicense';
 import Game from './pages/Game';
@@ -115,28 +116,30 @@ function AppContent() {
 
   return (
     <WalletProvider>
-      <Router>
-        <Routes>
-          <Route path="/" element={<Login />} />
-          <Route
-            path="/license"
-            element={
-              <ProtectedRoute>
-                <DriverLicense />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/game/:gameMode"
-            element={
-              <ProtectedRoute>
-                <Game />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Router>
+      <BlockchainToastProvider> {/* NEW WRAPPER */}
+        <Router>
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route
+              path="/license"
+              element={
+                <ProtectedRoute>
+                  <DriverLicense />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/game/:gameMode"
+              element={
+                <ProtectedRoute>
+                  <Game />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Router>
+      </BlockchainToastProvider> {/* END NEW WRAPPER */}
     </WalletProvider>
   );
 }
@@ -148,7 +151,7 @@ function App() {
     appearance: {
       theme: 'dark',
       accentColor: '#00d4ff',
-      logo: undefined, // Add your logo URL here if you have one
+      logo: undefined,
       showWalletLoginFirst: true,
     },
     wallets: {
@@ -163,11 +166,8 @@ function App() {
         createOnLogin: 'users-without-wallets',
       },
     },
-    // Mobile optimizations
     loginMethods: ['wallet', 'email', 'sms'],
-    // Add mobile-friendly settings
     mobileConfig: {
-      // Optimize for mobile wallet connections
       preferredWalletConnectVersion: 2,
     },
   };
