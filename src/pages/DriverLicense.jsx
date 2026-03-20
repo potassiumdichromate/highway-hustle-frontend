@@ -42,6 +42,8 @@ import JeepImg from '../assets/jeep.png';
 import PickupImg from '../assets/pickup.png';
 import SUVImg from '../assets/suv.png';
 import LamborghiniImg from '../assets/lamborghini.png';
+import MuscleImg from '../assets/muscle.png';
+import F1Img from '../assets/f1.png';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-backend.onrender.com/api';
 
@@ -52,7 +54,9 @@ const CAR_DATA = {
   6: { name: 'SUV', image: SUVImg, rarity: 'Rare' },
   8: { name: 'Jeep', image: JeepImg, rarity: 'Epic' },
   10: { name: 'Lamborghini', image: LamborghiniImg, rarity: 'Legendary' },
-  11: { name: 'CTR', image: CTRImg, rarity: 'Legendary' }
+  11: { name: 'CTR', image: CTRImg, rarity: 'Legendary' },
+  12: { name: 'Muscle', image: MuscleImg, rarity: 'Epic', price: 200 },
+  13: { name: 'F1', image: F1Img, rarity: 'Legendary', price: 250 }
 };
 
 // Get car name from index

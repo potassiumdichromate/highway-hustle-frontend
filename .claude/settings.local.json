@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/RENTKAR/Desktop/Highway-Hustle/React/highway-hustle/src -type f -name *.jsx -o -name *.js -o -name *.ts -o -name *.tsx)"
+    ]
+  }
+}
