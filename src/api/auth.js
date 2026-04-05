@@ -6,7 +6,8 @@ import { clearAuthSession } from '../lib/authSession';
 
 // API interceptor - adjust based on your actual implementation
 const apiInterceptor = async (config) => {
-  const baseURL =  'https://highway-hustle-backend.onrender.com/api';
+  const baseURL = import.meta.env.VITE_API_BASE_URL
+    || 'https://highway-hustle-backend.onrender.com/api';
   const url = `${baseURL}${config.url}`;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -101,6 +102,56 @@ export const login = async (payload = {}) => {
       success: false,
       message: 'Login failed',
       data: { token: '' },
+      error: error.message,
+    };
+  }
+};
+
+/**
+ * Auto-login using a browser JWT token.
+ * Called when the app is loaded with ?token=...&source=browser in the URL.
+ * Reference: guesstheai loginV2({ jwt, source: "browser" })
+ */
+export const autoLogin = async ({ jwt, source = 'browser' }) => {
+  console.log('[api/autoLogin] Sending /player/login/auto request');
+
+  if (!jwt) {
+    console.warn('[api/autoLogin] No jwt provided');
+    return undefined;
+  }
+
+  try {
+    const response = await apiInterceptor({
+      method: 'post',
+      url: '/player/login/auto',
+      data: { jwt, source },
+    });
+
+    const responsePayload = response.data?.data || response.data;
+
+    if (responsePayload && typeof window !== 'undefined') {
+      // Extract wallet address from the player data returned by the backend
+      const walletAddress =
+        responsePayload.privyData?.walletAddress ||
+        responsePayload.walletAddress ||
+        '';
+
+      if (walletAddress) {
+        localStorage.setItem('walletAddress', walletAddress);
+      }
+
+      console.log('[api/autoLogin] Auto-login succeeded', {
+        success: response.data?.success,
+        walletAddress: walletAddress ? `${walletAddress.slice(0, 6)}...` : 'none',
+      });
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error('[api/autoLogin] Auto-login failed', error);
+    return {
+      success: false,
+      message: 'Auto-login failed',
       error: error.message,
     };
   }

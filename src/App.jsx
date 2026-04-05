@@ -6,6 +6,7 @@ import { BlockchainToastProvider } from './context/BlockchainToastContext'; // N
 import Login from './pages/Login';
 import DriverLicense from './pages/DriverLicense';
 import Game from './pages/Game';
+import AutoLogin from './pages/AutoLogin';
 import ProtectedRoute from './components/ProtectedRoute';
 import './index.css';
 
@@ -42,6 +43,21 @@ const zeroGChain = {
     default: { name: '0G Explorer', url: 'https://chainscan.0g.ai' },
   },
 };
+
+/**
+ * If the root URL contains ?token=...&source=browser, render AutoLogin instead
+ * of the normal Login page.  This lets /?token=JWT&source=browser work the same
+ * as /auto-login?token=JWT&source=browser.
+ */
+function LoginOrAutoLogin() {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('token') && params.get('source') === 'browser') {
+      return <AutoLogin />;
+    }
+  }
+  return <Login />;
+}
 
 function AppContent() {
   useEffect(() => {
@@ -119,7 +135,8 @@ function AppContent() {
       <BlockchainToastProvider> {/* NEW WRAPPER */}
         <Router>
           <Routes>
-            <Route path="/" element={<Login />} />
+            <Route path="/" element={<LoginOrAutoLogin />} />
+            <Route path="/auto-login" element={<AutoLogin />} />
             <Route
               path="/license"
               element={
