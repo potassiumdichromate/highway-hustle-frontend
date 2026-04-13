@@ -52,7 +52,7 @@ const zeroGChain = {
 function LoginOrAutoLogin() {
   if (typeof window !== 'undefined') {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('token') && params.get('source') === 'browser') {
+    if (params.get('jwt') || params.get('token')) {
       return <AutoLogin />;
     }
   }

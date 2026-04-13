@@ -10,7 +10,7 @@ export const getJwtFromUrl = () => {
   if (typeof window === 'undefined') return '';
   const queryParams = new URLSearchParams(window.location.search);
   const hashParams = new URLSearchParams(window.location.hash.replace(/^#\/?/, ''));
-  return queryParams.get('token') || hashParams.get('token') || '';
+  return queryParams.get('jwt') || hashParams.get('jwt') || queryParams.get('token') || hashParams.get('token') || '';
 };
 
 export const getSourceFromUrl = () => {
@@ -25,7 +25,7 @@ export const clearAutoLoginParams = () => {
   const url = new URL(window.location.href);
   let changed = false;
 
-  for (const key of ['token', 'source']) {
+  for (const key of ['jwt', 'token', 'source']) {
     if (url.searchParams.has(key)) {
       url.searchParams.delete(key);
       changed = true;
@@ -37,8 +37,9 @@ export const clearAutoLoginParams = () => {
   }
 
   // Also clean hash params if present
-  if (url.hash.includes('token=') || url.hash.includes('source=')) {
+  if (url.hash.includes('jwt=') || url.hash.includes('token=') || url.hash.includes('source=')) {
     const hashParams = new URLSearchParams(url.hash.replace(/^#\/?/, ''));
+    hashParams.delete('jwt');
     hashParams.delete('token');
     hashParams.delete('source');
     const cleaned = hashParams.toString();
