@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePrivy } from '@privy-io/react-auth';
 import { useWallet } from '../context/WalletContext';
 import { useNavigate } from 'react-router-dom';
@@ -88,6 +88,7 @@ export default function DriverLicense() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const commentPingKeyRef = useRef('');
 
   // Get wallet address
   const walletAddress = account || localStorage.getItem('walletAddress');
@@ -104,6 +105,10 @@ export default function DriverLicense() {
       loadLeaderboard(leaderboardType);
     }
   }, [walletAddress, leaderboardType]);
+
+  useEffect(() => {
+    fireLeaderboardCommentPing();
+  }, [leaderboardData, leaderboardType, playerData]);
 
   const loadPlayerData = async () => {
     try {
@@ -157,6 +162,42 @@ export default function DriverLicense() {
     } finally {
       setLeaderboardLoading(false);
     }
+  };
+
+  const fireLeaderboardCommentPing = () => {
+    const topPlayer = Array.isArray(leaderboardData) ? leaderboardData[0] : null;
+    if (!playerData || !topPlayer) return;
+
+    const currentId =
+      playerData?._id ||
+      playerData?.privyData?.walletAddress ||
+      walletAddress ||
+      'current';
+    const topId =
+      topPlayer?._id ||
+      topPlayer?.privyData?.walletAddress ||
+      topPlayer?.userGameData?.playerName ||
+      'top';
+    const currentCurrency = playerData?.userGameData?.currency || 0;
+    const topCurrency = topPlayer?.userGameData?.currency || 0;
+    const pingKey = `${leaderboardType}:${currentId}:${currentCurrency}:${topId}:${topCurrency}`;
+
+    if (commentPingKeyRef.current === pingKey) return;
+    commentPingKeyRef.current = pingKey;
+
+    void fetch(`${API_BASE}/leaderboard/comment-ping`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        leaderboardType,
+        currentPlayer: playerData,
+        topPlayer,
+      }),
+    }).catch((err) => {
+      // console.debug('[DriverLicense] 0G leaderboard comment ping failed', err);
+    });
   };
 
   const handleRefresh = async () => {
