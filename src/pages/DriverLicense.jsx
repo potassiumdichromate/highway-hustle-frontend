@@ -101,14 +101,14 @@ export default function DriverLicense() {
   }, [walletAddress]);
 
   useEffect(() => {
-    if (walletAddress) {
+    if (walletAddress && activeSection === 'leaderboard') {
       loadLeaderboard(leaderboardType);
     }
-  }, [walletAddress, leaderboardType]);
+  }, [walletAddress, leaderboardType, activeSection]);
 
   useEffect(() => {
     fireLeaderboardCommentPing();
-  }, [leaderboardData, leaderboardType, playerData]);
+  }, [activeSection, leaderboardData, leaderboardType, playerData]);
 
   const loadPlayerData = async () => {
     try {
@@ -166,7 +166,7 @@ export default function DriverLicense() {
 
   const fireLeaderboardCommentPing = () => {
     const topPlayer = Array.isArray(leaderboardData) ? leaderboardData[0] : null;
-    if (!playerData || !topPlayer) return;
+    if (activeSection !== 'leaderboard' || !playerData || !topPlayer) return;
 
     const currentId =
       playerData?._id ||
