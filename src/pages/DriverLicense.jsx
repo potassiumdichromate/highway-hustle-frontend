@@ -979,6 +979,38 @@ function LeaderboardSection({
   onLeaderboardTypeChange,
   isLoading
 }) {
+  const [aiComment, setAiComment] = useState(null);
+  const [aiCommentLoading, setAiCommentLoading] = useState(false);
+  const aiCommentKeyRef = useRef('');
+
+  const walletAddress = playerData?.privyData?.walletAddress || localStorage.getItem('walletAddress');
+
+  // Fetch AI comment when leaderboard data + player data available
+  useEffect(() => {
+    if (!walletAddress || !leaderboardData?.length || !playerData) return;
+
+    const topPlayer = leaderboardData[0];
+    const currentCurrency = playerData?.userGameData?.currency || 0;
+    const topCurrency = topPlayer?.userGameData?.currency || 0;
+    const commentKey = `${leaderboardType}:${walletAddress}:${currentCurrency}:${topCurrency}`;
+
+    if (aiCommentKeyRef.current === commentKey) return;
+    aiCommentKeyRef.current = commentKey;
+
+    setAiCommentLoading(true);
+    setAiComment(null);
+
+    fetch(`${API_BASE}/leaderboard/ai-comment?user=${walletAddress}&type=${leaderboardType}&t=${Date.now()}`)
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.comment) {
+          setAiComment(data.comment);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setAiCommentLoading(false));
+  }, [walletAddress, leaderboardData, leaderboardType, playerData]);
+
   const tabs = [
     { key: 'global', label: 'Global Leaderboard', help: 'Top Highway Hustle players' },
     { key: 'gate', label: 'Gate Wallet Leaderboard', help: 'Only gate_wallet sign-ins' }
@@ -1015,6 +1047,22 @@ function LeaderboardSection({
           </button>
         ))}
       </div>
+
+      {/* AI Comment Banner */}
+      <AnimatePresence>
+        {aiComment && (
+          <motion.div
+            className="ai-comment-banner"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.4, ease: 'easeOut' }}
+          >
+            <Bot size={16} className="ai-comment-icon" />
+            <span className="ai-comment-text">{aiComment}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="leaderboard-list">
         {isLoading ? (

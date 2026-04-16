@@ -1518,6 +1518,33 @@
     left: 0.8rem;
   }
 }
+/* ==================== AI COMMENT BANNER ==================== */
+.ai-comment-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  background: rgba(114, 9, 183, 0.12);
+  border: 1px solid rgba(114, 9, 183, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.ai-comment-icon {
+  flex-shrink: 0;
+  color: #7209b7;
+  opacity: 0.7;
+}
+
+.ai-comment-text {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+}
+
 /* ==================== LEADERBOARD ==================== */
 .leaderboard-list {
   display: flex;
