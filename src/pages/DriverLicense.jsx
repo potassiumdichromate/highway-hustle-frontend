@@ -981,12 +981,13 @@ function LeaderboardSection({
 }) {
   const [aiComment, setAiComment] = useState(null);
   const [aiCommentLoading, setAiCommentLoading] = useState(false);
+  const [computeHighlightState, setComputeHighlightState] = useState('idle');
   const aiCommentKeyRef = useRef('');
+  const computeSuccessTimerRef = useRef(null);
 
   const walletAddress = playerData?.privyData?.walletAddress || localStorage.getItem('walletAddress');
 
-  // Fetch AI comment when leaderboard data + player data available
-  useEffect(() => {
+  const fetchAiComment = async (forceRefresh = false) => {
     if (!walletAddress || !leaderboardData?.length || !playerData) return;
 
     const topPlayer = leaderboardData[0];
@@ -994,21 +995,49 @@ function LeaderboardSection({
     const topCurrency = topPlayer?.userGameData?.currency || 0;
     const commentKey = `${leaderboardType}:${walletAddress}:${currentCurrency}:${topCurrency}`;
 
-    if (aiCommentKeyRef.current === commentKey) return;
+    if (!forceRefresh && aiCommentKeyRef.current === commentKey) return;
     aiCommentKeyRef.current = commentKey;
-
+    setComputeHighlightState('running');
     setAiCommentLoading(true);
-    setAiComment(null);
+    if (forceRefresh) {
+      setAiComment(null);
+    }
 
-    fetch(`${API_BASE}/leaderboard/ai-comment?user=${walletAddress}&type=${leaderboardType}&t=${Date.now()}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.success && data.comment) {
-          setAiComment(data.comment);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setAiCommentLoading(false));
+    try {
+      const res = await fetch(`${API_BASE}/leaderboard/ai-comment?user=${walletAddress}&type=${leaderboardType}&t=${Date.now()}`);
+      const data = await res.json();
+      if (data.success && data.comment) {
+        setAiComment(data.comment);
+        setComputeHighlightState('success');
+      }
+    } catch (_err) {
+      // No-op: keep UI stable if compute endpoint is temporarily unavailable.
+      setComputeHighlightState('idle');
+    } finally {
+      setAiCommentLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (computeHighlightState !== 'success') return undefined;
+    if (computeSuccessTimerRef.current) {
+      clearTimeout(computeSuccessTimerRef.current);
+    }
+    computeSuccessTimerRef.current = setTimeout(() => {
+      setComputeHighlightState('idle');
+      computeSuccessTimerRef.current = null;
+    }, 1800);
+    return () => {
+      if (computeSuccessTimerRef.current) {
+        clearTimeout(computeSuccessTimerRef.current);
+        computeSuccessTimerRef.current = null;
+      }
+    };
+  }, [computeHighlightState]);
+
+  // Fetch AI comment when leaderboard data + player data available
+  useEffect(() => {
+    void fetchAiComment(false);
   }, [walletAddress, leaderboardData, leaderboardType, playerData]);
 
   const tabs = [
@@ -1029,11 +1058,68 @@ function LeaderboardSection({
       : player.privyData?.discord || player.privyData?.email || 'Unknown'
   })) || [];
   const hasEntries = transformedLeaderboard.length > 0;
+  const topEntry = transformedLeaderboard[0];
+  const currentPlayerName = playerData?.userGameData?.playerName || 'You';
+  const computeStatusLabel = aiCommentLoading
+    ? '0G Compute is generating top-player insight...'
+    : aiComment
+      ? `Latest insight generated for top racer ${topEntry?.player || 'Unknown'}`
+      : 'Open leaderboard to trigger 0G compute insight';
 
   return (
     <div className="section" style={{minHeight:'75vh'}}>
       <h2 className="section-title">{title}</h2>
       <p className="section-subtitle">{subtitle}</p>
+      <div className={`compute-hero-card compute-hero-card-${computeHighlightState}`}>
+        <div className="compute-hero-top">
+          <div className="compute-flow-head">
+            <Zap size={16} />
+            <span>0G Compute Live</span>
+            <span className="ai-comment-badge">Powered by 0G Compute</span>
+            <span className="compute-live-pill">
+              <span className="compute-live-dot"></span>
+              Live
+            </span>
+          </div>
+          <button
+            type="button"
+            className={`compute-run-btn compute-run-btn-${computeHighlightState}`}
+            onClick={() => void fetchAiComment(true)}
+            disabled={aiCommentLoading}
+          >
+            {aiCommentLoading ? 'Running 0G Compute...' : 'Run 0G Compute Now'}
+          </button>
+        </div>
+
+        <p className="compute-flow-copy">
+          Vehicle Garage opened -> Leaderboard opened -> Top user analyzed -> AI comment visible.
+        </p>
+
+        {(aiComment || aiCommentLoading) && (
+          <div className="ai-comment-content compute-top-comment">
+            <span className="ai-comment-badge">Powered by 0G Compute</span>
+            <span className="ai-comment-text">
+              {aiCommentLoading ? 'Generating live insight from 0G Compute...' : aiComment}
+            </span>
+            {computeHighlightState === 'success' && (
+              <span className="compute-success-note">Insight generated successfully on 0G Compute</span>
+            )}
+          </div>
+        )}
+
+        <div className={`compute-step-grid compute-step-grid-${computeHighlightState}`}>
+          <div className="compute-step"><strong>1</strong><span>Vehicle Garage open</span></div>
+          <div className="compute-step"><strong>2</strong><span>Leaderboard open</span></div>
+          <div className="compute-step"><strong>3</strong><span>Top racer analyzed</span></div>
+          <div className="compute-step"><strong>4</strong><span>AI comment generated</span></div>
+        </div>
+
+        <div className="compute-flow-meta">
+          <span>Driver: {currentPlayerName}</span>
+          <span>Top Racer: {topEntry?.player || 'Unknown'}</span>
+          <span>{computeStatusLabel}</span>
+        </div>
+      </div>
       <div className="leaderboard-tabs">
         {tabs.map((tab) => (
           <button
@@ -1047,22 +1133,6 @@ function LeaderboardSection({
           </button>
         ))}
       </div>
-
-      {/* AI Comment Banner */}
-      <AnimatePresence>
-        {aiComment && (
-          <motion.div
-            className="ai-comment-banner"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.4, ease: 'easeOut' }}
-          >
-            <Bot size={16} className="ai-comment-icon" />
-            <span className="ai-comment-text">{aiComment}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="leaderboard-list">
         {isLoading ? (
