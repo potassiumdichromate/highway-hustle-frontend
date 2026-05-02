@@ -3,10 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowLeft, Maximize, Minimize } from 'lucide-react';
 import { useBlockchainToast } from '../context/BlockchainToastContext';
+import { apiInterceptor } from '../api/auth';
 import UNITY_BUILDS from '../config/unityBuilds';
 import './Game.css';
-
-const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-backend.onrender.com/api';
 
 export default function Game() {
   const { gameMode } = useParams();
@@ -15,6 +14,7 @@ export default function Game() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [walletAddress, setWalletAddress] = useState(null);
+  const [token, setToken] =  useState(null);
   const [hasCalledApi, setHasCalledApi] = useState(false); // Track if API was called
 
   const gameModeNames = {
@@ -27,10 +27,12 @@ export default function Game() {
   // Get wallet address from localStorage on component mount
   useEffect(() => {
     const wallet = localStorage.getItem('walletAddress');
+    const token  =  localStorage.getItem('token');
     
     if (wallet) {
       console.log('✅ Wallet address found:', wallet);
       setWalletAddress(wallet);
+      setToken(token);
     } else {
       console.warn('⚠️ No wallet address found in localStorage');
       navigate('/license'); // Redirect if no wallet
@@ -49,19 +51,15 @@ export default function Game() {
   const callGameStartApi = async () => {
     try {
       const timestamp = Date.now();
-      const apiUrl = `${API_BASE}/player/all?user=${walletAddress}&t=${timestamp}`;
-      
+      const apiUrl = `/player/all?user=${walletAddress}&t=${timestamp}`;
+
       console.log('📡 Calling API:', apiUrl);
-      
-      const response = await fetch(apiUrl, {
+
+      const { data } = await apiInterceptor({
         method: 'GET',
-        headers: {
-          'Cache-Control': 'no-cache',
-          'Pragma': 'no-cache'
-        }
+        url: apiUrl,
+        headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
       });
-      
-      const data = await response.json();
       
       console.log('✅ API Response:', data);
       
@@ -131,9 +129,14 @@ export default function Game() {
       return baseUrl;
     }
 
+    if (!token) {
+      console.warn(" token is required");
+      return baseUrl;
+    }
+
     // Append wallet address as query parameter
     const separator = baseUrl.includes('?') ? '&' : '?';
-    const fullUrl = `${baseUrl}${separator}wallet=${encodeURIComponent(walletAddress)}`;
+    const fullUrl = `${baseUrl}${separator}wallet=${encodeURIComponent(walletAddress)}&token=${token}`;
     
     console.log('🎮 Unity build URL with wallet:', fullUrl);
     return fullUrl;

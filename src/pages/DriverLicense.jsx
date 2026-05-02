@@ -25,7 +25,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import SynthwaveBackground from '../components/SynthwaveBackground';
-import { logout as clearAuth } from '../api/auth';
+import { logout as clearAuth, apiInterceptor } from '../api/auth';
 import './DriverLicense.css';
 
 // Import game assets
@@ -114,8 +114,7 @@ export default function DriverLicense() {
     try {
       setIsLoading(true);
       const timestamp = Date.now();
-      const response = await fetch(`${API_BASE}/player/all?user=${walletAddress}&t=${timestamp}`);
-      const data = await response.json();
+      const { data } = await apiInterceptor({ url: `/player/all?user=${walletAddress}&t=${timestamp}` });
       
       if (data.success) {
         setPlayerData(data.data);
@@ -146,10 +145,9 @@ export default function DriverLicense() {
       const timestamp = Date.now();
       const endpoint =
         type === 'gate'
-          ? `${API_BASE}/leaderboard/gate-wallet`
-          : `${API_BASE}/leaderboard`;
-      const response = await fetch(`${endpoint}?t=${timestamp}`);
-      const data = await response.json();
+          ? `/leaderboard/gate-wallet`
+          : `/leaderboard`;
+      const { data } = await apiInterceptor({ url: `${endpoint}?t=${timestamp}` });
       
       if (data.success) {
         setLeaderboardData(data.leaderboard);
@@ -185,16 +183,10 @@ export default function DriverLicense() {
     if (commentPingKeyRef.current === pingKey) return;
     commentPingKeyRef.current = pingKey;
 
-    void fetch(`${API_BASE}/leaderboard/comment-ping`, {
+    void apiInterceptor({
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        leaderboardType,
-        currentPlayer: playerData,
-        topPlayer,
-      }),
+      url: '/leaderboard/comment-ping',
+      data: { leaderboardType, currentPlayer: playerData, topPlayer },
     }).catch((err) => {
       // console.debug('[DriverLicense] 0G leaderboard comment ping failed', err);
     });
@@ -627,13 +619,11 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
     setIsSavingName(true);
     try {
       const timestamp = Date.now();
-      const response = await fetch(`${API_BASE}/player/game?user=${walletAddress}&t=${timestamp}`, {
+      const { data } = await apiInterceptor({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ playerName: tempName })
+        url: `/player/game?user=${walletAddress}&t=${timestamp}`,
+        data: { playerName: tempName },
       });
-
-      const data = await response.json();
       if (data.success) {
         setDisplayName(tempName);
         setIsEditingName(false);
@@ -879,15 +869,11 @@ function GarageSection({ playerData }) {
 
     try {
       const timestamp = Date.now();
-      const response = await fetch(`${API_BASE}/player/vehicle?user=${walletAddress}&t=${timestamp}`, {
+      const { data } = await apiInterceptor({
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          selectedPlayerCarIndex: carIndex 
-        })
+        url: `/player/vehicle?user=${walletAddress}&t=${timestamp}`,
+        data: { selectedPlayerCarIndex: carIndex },
       });
-
-      const data = await response.json();
       
       if (data.success) {
         setSelectedCarIndex(carIndex);
@@ -1004,8 +990,9 @@ function LeaderboardSection({
     }
 
     try {
-      const res = await fetch(`${API_BASE}/leaderboard/ai-comment?user=${walletAddress}&type=${leaderboardType}&t=${Date.now()}`);
-      const data = await res.json();
+      const { data } = await apiInterceptor({
+        url: `/leaderboard/ai-comment?user=${walletAddress}&type=${leaderboardType}&t=${Date.now()}`,
+      });
       if (data.success && data.comment) {
         setAiComment(data.comment);
         setComputeHighlightState('success');
@@ -1092,7 +1079,7 @@ function LeaderboardSection({
         </div>
 
         <p className="compute-flow-copy">
-          Vehicle Garage opened -> Leaderboard opened -> Top user analyzed -> AI comment visible.
+          Vehicle Garage opened {'>'} Leaderboard opened {'>'} Top user analyzed {'>'} AI comment visible.
         </p>
 
         {(aiComment || aiCommentLoading) && (

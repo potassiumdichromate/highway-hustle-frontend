@@ -377,8 +377,8 @@ const styles = {
   },
 };
 
-const API_BASE_URL = 'https://highway-hustle-backend.onrender.com/api';
-  // import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+// const API_BASE_URL = 'https://highway-hustle-backend.onrender.com/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 const recordPrivyLogin = async ({ identifier, privyMetaData = {} }) => {
   if (!identifier) return;
@@ -396,9 +396,18 @@ const recordPrivyLogin = async ({ identifier, privyMetaData = {} }) => {
       throw new Error(payload.error || 'Privy login tracking failed');
     }
 
+    const issuedToken = payload?.data?.token;
+    if (issuedToken && typeof window !== 'undefined') {
+      localStorage.setItem('token', issuedToken);
+      window.dispatchEvent(
+        new CustomEvent('presence:token-change', { detail: issuedToken })
+      );
+    }
+
     console.log('[LoginModal] Privy login recorded', {
       identifier,
       recordedAt: payload.data?.recordedAt,
+      tokenIssued: Boolean(issuedToken),
     });
   } catch (err) {
     console.error('[LoginModal] Failed to record privy login metadata', err);
