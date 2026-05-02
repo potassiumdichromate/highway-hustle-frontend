@@ -93,12 +93,21 @@ export default function DriverLicense() {
   // Get wallet address
   const walletAddress = account || localStorage.getItem('walletAddress');
 
-  // Load player data from backend
+  // Track auth token so we don't fire the API before login stores it
+  const [authToken, setAuthToken] = useState(localStorage.getItem('token'));
+
   useEffect(() => {
-    if (walletAddress) {
+    const handleTokenChange = (e) => setAuthToken(e.detail);
+    window.addEventListener('presence:token-change', handleTokenChange);
+    return () => window.removeEventListener('presence:token-change', handleTokenChange);
+  }, []);
+
+  // Load player data from backend — only once both wallet and token are ready
+  useEffect(() => {
+    if (walletAddress && authToken) {
       loadPlayerData();
     }
-  }, [walletAddress]);
+  }, [walletAddress, authToken]);
 
   useEffect(() => {
     if (walletAddress && activeSection === 'leaderboard') {
