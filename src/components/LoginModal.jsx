@@ -409,8 +409,10 @@ const recordPrivyLogin = async ({ identifier, privyMetaData = {} }) => {
       recordedAt: payload.data?.recordedAt,
       tokenIssued: Boolean(issuedToken),
     });
+    return issuedToken || null;
   } catch (err) {
     console.error('[LoginModal] Failed to record privy login metadata', err);
+    return null;
   }
 };
 
@@ -886,7 +888,7 @@ function LoginModal({ open, onClose, logoSrc }) {
     });
   }, [ready, user]);
 
-  const persistAuthSession = ({
+  const persistAuthSession = async ({
     source,
     loginType,
     wallet,
@@ -1020,8 +1022,9 @@ function LoginModal({ open, onClose, logoSrc }) {
       connectionEmail ||
       connectionDiscord ||
       getCandidateAddress(primaryConnectionCandidate);
+    let issuedToken = null;
     if (loginIdentifier) {
-      recordPrivyLogin({
+      issuedToken = await recordPrivyLogin({
         identifier: loginIdentifier,
         privyMetaData: {
           ...privyMetaData,
@@ -1032,6 +1035,12 @@ function LoginModal({ open, onClose, logoSrc }) {
       });
     }
 
+    console.log('[LoginModal] Backend token status after login metadata record', {
+      loginIdentifier,
+      tokenIssued: Boolean(issuedToken),
+      tokenInStorage: typeof window !== 'undefined' ? Boolean(localStorage.getItem('token')) : false,
+    });
+
     return setAuthSession(sessionPayload);
   };
 
@@ -1040,12 +1049,12 @@ function LoginModal({ open, onClose, logoSrc }) {
     const existingSession = getAuthSession();
     if (!existingSession) {
       console.log('[LoginModal] No session found; creating from Privy user');
-      persistAuthSession({ source: 'privy', loginType: 'privy' });
+      void persistAuthSession({ source: 'privy', loginType: 'privy' });
       return;
     }
 
     console.log('[LoginModal] Refreshing session with latest Privy user data');
-    persistAuthSession({
+    void persistAuthSession({
       source: existingSession.source || 'privy',
       loginType: existingSession.loginType,
       walletAddress: existingSession.walletAddress,
@@ -1093,7 +1102,7 @@ function LoginModal({ open, onClose, logoSrc }) {
 
       if (needsUpdate) {
         console.log('[LoginModal] Syncing privyMetaData from privy:connections');
-        persistAuthSession({ source: 'privy', loginType: 'privy' });
+        void persistAuthSession({ source: 'privy', loginType: 'privy' });
         clearInterval(interval);
         return;
       }
@@ -1112,13 +1121,14 @@ function LoginModal({ open, onClose, logoSrc }) {
           loginData && typeof loginData === 'object' ? Object.keys(loginData) : [],
       });
       console.log('[LoginModal] Login success, checking localStorage');
-      const session = getAuthSession();
+      let session = getAuthSession();
       const userSnapshot = getAuthUser();
       const privyMetaDataRaw = localStorage.getItem('privyMetaData');
       const privyMetaData = safeParseJson(privyMetaDataRaw);
       const storedWalletAddress = localStorage.getItem('walletAddress');
       const sessionRaw = localStorage.getItem('privySession');
       const userRaw = localStorage.getItem('privyUser');
+      let backendToken = localStorage.getItem('token');
       const sessionActive = isSessionActive();
       
       console.log('[LoginModal] Login data stored in localStorage:', {
@@ -1134,7 +1144,26 @@ function LoginModal({ open, onClose, logoSrc }) {
         timestamp: new Date().toISOString(),
       });
 
-      if (sessionActive) {
+      if (!backendToken && session) {
+        const fallbackIdentifier =
+          session.walletAddress ||
+          userSnapshot?.wallet?.address ||
+          userSnapshot?.email?.address ||
+          userSnapshot?.id;
+        if (fallbackIdentifier) {
+          console.warn('[LoginModal] Missing backend token after login, retrying token issue', {
+            fallbackIdentifier: summarizeAddress(fallbackIdentifier),
+          });
+          await recordPrivyLogin({
+            identifier: fallbackIdentifier,
+            privyMetaData: safeParseJson(localStorage.getItem('privyMetaData')) || {},
+          });
+          session = getAuthSession();
+          backendToken = localStorage.getItem('token');
+        }
+      }
+
+      if (sessionActive && backendToken) {
         console.log('[LoginModal] Session verified, closing modal and navigating');
         if (dialogRef.current?.open) {
           dialogRef.current.close();
@@ -1147,8 +1176,11 @@ function LoginModal({ open, onClose, logoSrc }) {
           navigate('/license');
         }, 300);
       } else {
-        console.error('[LoginModal] Login failed - no session in localStorage');
-        setError('Login failed - no session saved');
+        console.error('[LoginModal] Login failed - missing session or backend token', {
+          hasSession: !!session,
+          hasBackendToken: !!backendToken,
+        });
+        setError('Login failed - backend token missing. Please try again.');
       }
     } catch (err) {
       console.error('[LoginModal] Error in handleLoginSuccess:', err);
@@ -1193,7 +1225,7 @@ function LoginModal({ open, onClose, logoSrc }) {
           walletType,
         });
 
-        const session = persistAuthSession({
+        const session = await persistAuthSession({
           source: 'wallet',
           loginType: walletType,
           wallet: resolvedWallet,
@@ -1256,7 +1288,7 @@ function LoginModal({ open, onClose, logoSrc }) {
           loginUser?.linkedAccounts?.find((acc) => acc.type === 'oauth')?.providerName ||
           'google';
         const ensuredWalletAddress = await ensureEmbeddedWallet(loginUser, 'oauth');
-        const session = persistAuthSession({
+        const session = await persistAuthSession({
           source: 'oauth',
           loginType: oauthProvider,
           walletAddress: ensuredWalletAddress,
@@ -1296,7 +1328,7 @@ function LoginModal({ open, onClose, logoSrc }) {
         });
         console.log('[LoginModal] Email login completed, saving session');
         const ensuredWalletAddress = await ensureEmbeddedWallet(loginUser, 'email');
-        const session = persistAuthSession({
+        const session = await persistAuthSession({
           source: 'email',
           loginType: 'email',
           walletAddress: ensuredWalletAddress,
@@ -1505,7 +1537,7 @@ function LoginModal({ open, onClose, logoSrc }) {
       // 4. Proceed to Backend Login
       console.log('[LoginModal] Logging in with Gate Wallet address:', address);
 
-      const session = persistAuthSession({
+      const session = await persistAuthSession({
         source: 'gate_wallet',
         loginType: 'gate_wallet',
         walletAddress: address,

@@ -4,6 +4,45 @@
 
 import { clearAuthSession } from '../lib/authSession';
 
+const decodeJwtPayload = (token) => {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = `${base64}${'='.repeat((4 - (base64.length % 4)) % 4)}`;
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch (_err) {
+    return null;
+  }
+};
+
+const isTokenExpiredResponse = (status, payload) => {
+  if (status !== 401) return false;
+  const errorText =
+    payload?.error ||
+    payload?.message ||
+    payload?.code ||
+    '';
+  return /token|expired|unauthorized|unauthorised|jwt/i.test(String(errorText));
+};
+
+const forceLogoutForExpiredToken = () => {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('token');
+  localStorage.removeItem('username');
+  localStorage.removeItem('sessionWallet');
+  localStorage.removeItem('walletAddress');
+  clearAuthSession();
+  window.dispatchEvent(new CustomEvent('presence:token-change', { detail: null }));
+  // Route to login without hard reload so debug logs remain visible.
+  if (window.location.pathname !== '/') {
+    window.history.replaceState({}, '', '/');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }
+};
+
 // API interceptor - adjust based on your actual implementation
 export const apiInterceptor = async (config) => {
   const baseURL = import.meta.env.VITE_API_BASE_URL
@@ -11,6 +50,9 @@ export const apiInterceptor = async (config) => {
   const url = `${baseURL}${config.url}`;
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const tokenPayload = decodeJwtPayload(token);
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  const expSeconds = Number(tokenPayload?.exp || 0);
 
   const headers = {
     'Content-Type': 'application/json',
@@ -19,6 +61,15 @@ export const apiInterceptor = async (config) => {
   };
 
   try {
+    console.log('[api] Request start', {
+      method: (config.method || 'GET').toUpperCase(),
+      url,
+      hasToken: Boolean(token),
+      hasAuthorizationHeader: Boolean(headers.Authorization),
+      tokenExpISO: expSeconds ? new Date(expSeconds * 1000).toISOString() : null,
+      tokenExpiredAtClient: expSeconds ? expSeconds <= nowSeconds : null,
+    });
+
     const response = await fetch(url, {
       method: config.method || 'GET',
       headers,
@@ -26,10 +77,52 @@ export const apiInterceptor = async (config) => {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      let errorPayload = null;
+      const responseText = await response.text();
+      if (responseText) {
+        try {
+          errorPayload = JSON.parse(responseText);
+        } catch (_parseErr) {
+          errorPayload = { message: responseText };
+        }
+      }
+
+      console.warn('[api] Request failed', {
+        method: (config.method || 'GET').toUpperCase(),
+        url,
+        status: response.status,
+        hasToken: Boolean(token),
+        tokenExpISO: expSeconds ? new Date(expSeconds * 1000).toISOString() : null,
+        tokenExpiredAtClient: expSeconds ? expSeconds <= nowSeconds : null,
+        responsePayload: errorPayload,
+      });
+
+      if (isTokenExpiredResponse(response.status, errorPayload)) {
+        console.warn('[api] Triggering forced logout due to 401 token/auth response', {
+          method: (config.method || 'GET').toUpperCase(),
+          url,
+          status: response.status,
+          reason: errorPayload?.error || errorPayload?.message || errorPayload?.code || 'unknown',
+        });
+        forceLogoutForExpiredToken();
+      }
+
+      const enrichedError = new Error(
+        errorPayload?.error ||
+          errorPayload?.message ||
+          `HTTP error! status: ${response.status}`
+      );
+      enrichedError.status = response.status;
+      enrichedError.payload = errorPayload;
+      throw enrichedError;
     }
 
     const jsonData = await response.json();
+    console.log('[api] Request success', {
+      method: (config.method || 'GET').toUpperCase(),
+      url,
+      status: response.status,
+    });
     return { data: jsonData };
   } catch (error) {
     console.error('API request failed:', error);
