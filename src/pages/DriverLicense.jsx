@@ -682,6 +682,14 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
   };
 
   const level = Math.floor(stats.totalScore / 1000) + 1;
+  const explorerBase = 'https://chainscan.0g.ai/address/';
+  const contractEntries = [
+    { key: 'SESSION', label: 'Session Contract', address: import.meta.env.VITE_SESSION_CONTRACT_ADDRESS || '' },
+    { key: 'SCORE', label: 'Score Contract', address: import.meta.env.VITE_SCORE_CONTRACT_ADDRESS || '' },
+    { key: 'VEHICLE', label: 'Vehicle Contract', address: import.meta.env.VITE_VEHICLE_CONTRACT_ADDRESS || '' },
+    { key: 'MISSION', label: 'Mission Contract', address: import.meta.env.VITE_MISSION_CONTRACT_ADDRESS || '' },
+    { key: 'ECONOMY', label: 'Economy Contract', address: import.meta.env.VITE_ECONOMY_CONTRACT_ADDRESS || '' },
+  ].filter((entry) => /^0x[a-fA-F0-9]{40}$/.test(entry.address));
 
   return (
     <div className="section">
@@ -774,6 +782,82 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
             stats={gameModeStats.timeBomb}
           />
         </div>
+      </div>
+
+      {/* 0G Feature Visibility */}
+      <div className="game-modes-section">
+        <h3 className="subsection-title">0G FEATURES USED IN GAME</h3>
+        <div className="game-modes-grid">
+          <GameModeCard
+            title="0G EVM"
+            icon="⛓️"
+            stats={{
+              bestScore: stats.totalScore,
+              timePlayed: "Session + score + vehicle events",
+            }}
+          />
+          <GameModeCard
+            title="0G DA"
+            icon="🧾"
+            stats={{
+              bestScore: playerData?.campaignData?.Achieved1000M ? 1 : 0,
+              timePlayed: "Player state snapshots",
+            }}
+          />
+          <GameModeCard
+            title="0G Compute"
+            icon="🧠"
+            stats={{
+              bestScore: leaderboardDataSafe(playerData),
+              timePlayed: "AI leaderboard commentary",
+            }}
+          />
+          <GameModeCard
+            title="0G Explorer Proof"
+            icon="🔍"
+            stats={{
+              bestScore: 1,
+              timePlayed: "On-chain verification ready",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* 0G Contract Addresses */}
+      <div className="game-modes-section">
+        <h3 className="subsection-title">0G CONTRACT ADDRESSES</h3>
+        {contractEntries.length === 0 ? (
+          <div className="vehicle-card">
+            <p style={{ textAlign: 'center', opacity: 0.8 }}>
+              Contract addresses are not configured in frontend env yet.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {contractEntries.map((entry) => {
+              const shortAddress = `${entry.address.slice(0, 6)}...${entry.address.slice(-4)}`;
+              return (
+                <div key={entry.key} className="vehicle-card" style={{ padding: '1rem' }}>
+                  <div className="vehicle-header" style={{ justifyContent: 'space-between', gap: '1rem' }}>
+                    <div>
+                      <h4>{entry.label}</h4>
+                      <p style={{ opacity: 0.8, fontFamily: 'monospace', marginTop: '0.25rem' }}>{shortAddress}</p>
+                    </div>
+                    <a
+                      href={`${explorerBase}${entry.address}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="select-btn"
+                      style={{ minWidth: '120px', textAlign: 'center' }}
+                    >
+                      View on Scan
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Vehicle Stats */}
@@ -1271,4 +1355,14 @@ function formatPlayTime(seconds) {
   const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${hours}h ${minutes}m`;
+}
+
+function leaderboardDataSafe(playerData) {
+  return Number(
+    playerData?.playerGameModeData?.bestScoreOneWay ||
+    playerData?.playerGameModeData?.bestScoreTwoWay ||
+    playerData?.playerGameModeData?.bestScoreTimeAttack ||
+    playerData?.playerGameModeData?.bestScoreBomb ||
+    0
+  );
 }
