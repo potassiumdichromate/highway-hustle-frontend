@@ -1,5 +1,20 @@
 const AUTH_SESSION_KEY = 'privySession';
 const AUTH_USER_KEY = 'privyUser';
+const TOKEN_KEY = 'token';
+
+const getTokenPayload = (token) => {
+  if (!token || typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length < 2) return null;
+  try {
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = `${base64}${'='.repeat((4 - (base64.length % 4)) % 4)}`;
+    const json = atob(padded);
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+};
 
 const safeSetItem = (key, value) => {
   try {
@@ -70,8 +85,11 @@ export const clearAuthSession = () => {
 
 export const isSessionActive = () => {
   if (typeof window === 'undefined') return false;
-  const hasToken = !!localStorage.getItem('token');
+  const token = localStorage.getItem(TOKEN_KEY);
+  const tokenPayload = getTokenPayload(token);
+  const exp = Number(tokenPayload?.exp || 0);
+  const hasValidToken = Boolean(token && (!exp || exp > Math.floor(Date.now() / 1000)));
   const hasSession = !!localStorage.getItem(AUTH_SESSION_KEY);
   const hasUser = !!localStorage.getItem(AUTH_USER_KEY);
-  return Boolean(hasToken || hasSession || hasUser);
+  return Boolean(hasValidToken && (hasSession || hasUser));
 };

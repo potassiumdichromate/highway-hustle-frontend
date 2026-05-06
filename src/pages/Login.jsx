@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import SynthwaveBackground from '../components/SynthwaveBackground';
 import LoginModal from '../components/LoginModal';
 import { isSessionActive } from '../lib/authSession';
+import { debugLog } from '../lib/debug';
 import './Login.css';
 
 // Import logos from assets
@@ -23,7 +24,7 @@ export default function Login() {
   useEffect(() => {
     const maybeRedirect = () => {
       if (isSessionActive()) {
-        console.log('[Login] Session detected, redirecting to /license');
+        debugLog('[Login] Session detected, redirecting to /license');
         navigate('/license');
       }
     };
@@ -56,7 +57,7 @@ export default function Login() {
       localStorage.getItem('privy:connection') ||
       '';
 
-    console.log('[Login] Privy state snapshot', {
+    debugLog('[Login] Privy state snapshot', {
       ready,
       authenticated,
       hasUser: !!user,
@@ -81,7 +82,7 @@ export default function Login() {
   }, [ready, authenticated, user]);
 
   const handleOpenLoginModal = () => {
-    console.log('[Login] Opening login modal');
+    debugLog('[Login] Opening login modal');
     setShowLoginModal(true);
   };
 
@@ -121,6 +122,10 @@ export default function Login() {
                 alt="Kult Games" 
                 className="kult-logo"
               />
+            </div>
+            <div className="og-powered-badge">
+              <img src={KultLogo} alt="0G" className="og-powered-logo" />
+              <span>Powered by 0G Data Availability</span>
             </div>
           </motion.div>
 
@@ -189,10 +194,10 @@ export default function Login() {
       </div>
 
       {/* Login Modal */}
-      <LoginModal 
+          <LoginModal 
         open={showLoginModal}
         onClose={() => {
-          console.log('[Login] Closing login modal');
+          debugLog('[Login] Closing login modal');
           setShowLoginModal(false);
         }}
         logoSrc={HighwayHustleLogo}

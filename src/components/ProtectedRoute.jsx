@@ -1,6 +1,7 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { isSessionActive } from '../lib/authSession';
+import { debugLog } from '../lib/debug';
 
 export default function ProtectedRoute({ children }) {
   const hasSession = isSessionActive();
@@ -9,7 +10,7 @@ export default function ProtectedRoute({ children }) {
     typeof window !== 'undefined' ? !!localStorage.getItem('privySession') : false;
   const hasPrivyUser =
     typeof window !== 'undefined' ? !!localStorage.getItem('privyUser') : false;
-  console.log('[ProtectedRoute] Checking authentication:', {
+  debugLog('[ProtectedRoute] Checking authentication:', {
     hasSession,
     hasToken,
     hasPrivySession,
@@ -17,10 +18,10 @@ export default function ProtectedRoute({ children }) {
   });
 
   if (!hasSession) {
-    console.log('[ProtectedRoute] No session found, redirecting to login');
+    debugLog('[ProtectedRoute] No session found, redirecting to login');
     return <Navigate to="/" replace />;
   }
 
-  console.log('[ProtectedRoute] User authenticated, allowing access');
+  debugLog('[ProtectedRoute] User authenticated, allowing access');
   return children;
 }

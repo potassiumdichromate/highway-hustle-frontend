@@ -3,6 +3,7 @@
  */
 
 import { clearAuthSession } from '../lib/authSession';
+import { debugError, debugLog, debugWarn } from '../lib/debug';
 
 const decodeJwtPayload = (token) => {
   if (!token || typeof token !== 'string') return null;
@@ -61,7 +62,7 @@ export const apiInterceptor = async (config) => {
   };
 
   try {
-    console.log('[api] Request start', {
+    debugLog('[api] Request start', {
       method: (config.method || 'GET').toUpperCase(),
       url,
       hasToken: Boolean(token),
@@ -87,7 +88,7 @@ export const apiInterceptor = async (config) => {
         }
       }
 
-      console.warn('[api] Request failed', {
+      debugWarn('[api] Request failed', {
         method: (config.method || 'GET').toUpperCase(),
         url,
         status: response.status,
@@ -98,7 +99,7 @@ export const apiInterceptor = async (config) => {
       });
 
       if (isTokenExpiredResponse(response.status, errorPayload)) {
-        console.warn('[api] Triggering forced logout due to 401 token/auth response', {
+        debugWarn('[api] Triggering forced logout due to 401 token/auth response', {
           method: (config.method || 'GET').toUpperCase(),
           url,
           status: response.status,
@@ -118,14 +119,14 @@ export const apiInterceptor = async (config) => {
     }
 
     const jsonData = await response.json();
-    console.log('[api] Request success', {
+    debugLog('[api] Request success', {
       method: (config.method || 'GET').toUpperCase(),
       url,
       status: response.status,
     });
     return { data: jsonData };
   } catch (error) {
-    console.error('API request failed:', error);
+    debugError('API request failed:', error);
     throw error;
   }
 };
@@ -135,17 +136,17 @@ export const apiInterceptor = async (config) => {
  * Sends user data to backend for authentication
  */
 export const login = async (payload = {}) => {
-  console.log('[api/login] Sending /user/login request', payload);
+  debugLog('[api/login] Sending /user/login request');
 
   if (!payload?.walletAddress && !payload?.jwt) {
-    console.warn('[api/login] No walletAddress or jwt provided');
+    debugWarn('[api/login] No walletAddress or jwt provided');
     return undefined;
   }
 
   // Check for existing token
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   if (token) {
-    console.log('[api/login] Existing JWT found, skipping login');
+    debugLog('[api/login] Existing JWT found, skipping login');
     return undefined;
   }
 
@@ -182,7 +183,7 @@ export const login = async (payload = {}) => {
         new CustomEvent('presence:token-change', { detail: newToken })
       );
 
-      console.log('[api/login] Login succeeded; token and username stored', {
+      debugLog('[api/login] Login succeeded; token and username stored', {
         hasToken: !!newToken,
         username: userName,
       });
@@ -190,7 +191,7 @@ export const login = async (payload = {}) => {
 
     return response.data;
   } catch (error) {
-    console.error('[api/login] Login failed', error);
+    debugError('[api/login] Login failed', error);
     return {
       success: false,
       message: 'Login failed',
@@ -206,10 +207,10 @@ export const login = async (payload = {}) => {
  * Reference: guesstheai loginV2({ jwt, source: "browser" })
  */
 export const autoLogin = async ({ jwt, source = 'browser' }) => {
-  console.log('[api/autoLogin] Sending /player/login/auto request');
+  debugLog('[api/autoLogin] Sending /player/login/auto request');
 
   if (!jwt) {
-    console.warn('[api/autoLogin] No jwt provided');
+    debugWarn('[api/autoLogin] No jwt provided');
     return undefined;
   }
 
@@ -233,7 +234,7 @@ export const autoLogin = async ({ jwt, source = 'browser' }) => {
         localStorage.setItem('walletAddress', walletAddress);
       }
 
-      console.log('[api/autoLogin] Auto-login succeeded', {
+      debugLog('[api/autoLogin] Auto-login succeeded', {
         success: response.data?.success,
         walletAddress: walletAddress ? `${walletAddress.slice(0, 6)}...` : 'none',
       });
@@ -241,7 +242,7 @@ export const autoLogin = async ({ jwt, source = 'browser' }) => {
 
     return response.data;
   } catch (error) {
-    console.error('[api/autoLogin] Auto-login failed', error);
+    debugError('[api/autoLogin] Auto-login failed', error);
     return {
       success: false,
       message: 'Auto-login failed',

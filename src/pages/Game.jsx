@@ -5,6 +5,7 @@ import { ArrowLeft, Maximize, Minimize } from 'lucide-react';
 import { useBlockchainToast } from '../context/BlockchainToastContext';
 import { apiInterceptor } from '../api/auth';
 import UNITY_BUILDS from '../config/unityBuilds';
+import { debugLog, debugWarn, debugError } from '../lib/debug';
 import './Game.css';
 
 export default function Game() {
@@ -30,11 +31,11 @@ export default function Game() {
     const token  =  localStorage.getItem('token');
     
     if (wallet) {
-      console.log('✅ Wallet address found:', wallet);
+      debugLog('✅ Wallet address found:', wallet);
       setWalletAddress(wallet);
       setToken(token);
     } else {
-      console.warn('⚠️ No wallet address found in localStorage');
+      debugWarn('⚠️ No wallet address found in localStorage');
       navigate('/license'); // Redirect if no wallet
     }
   }, [navigate]);
@@ -42,7 +43,7 @@ export default function Game() {
   // Call API when wallet address is available (game starts)
   useEffect(() => {
     if (walletAddress && !hasCalledApi) {
-      console.log('🎮 Game starting - calling API...');
+      debugLog('🎮 Game starting - calling API...');
       callGameStartApi();
       setHasCalledApi(true);
     }
@@ -53,7 +54,7 @@ export default function Game() {
       const timestamp = Date.now();
       const apiUrl = `/player/all?user=${walletAddress}&t=${timestamp}`;
 
-      console.log('📡 Calling API:', apiUrl);
+      debugLog('📡 Calling API:', apiUrl);
 
       const { data } = await apiInterceptor({
         method: 'GET',
@@ -61,12 +62,12 @@ export default function Game() {
         headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
       });
       
-      console.log('✅ API Response:', data);
+      debugLog('✅ API Response:', data);
       
       if (data.success) {
         // Show toast based on blockchain response
         if (data.blockchain?.success && data.blockchain?.txHash) {
-          console.log('🔗 Blockchain transaction successful:', data.blockchain.txHash);
+          debugLog('🔗 Blockchain transaction successful:', data.blockchain.txHash);
           
           showToast({
             title: '🎮 Game Session Started',
@@ -75,7 +76,7 @@ export default function Game() {
             duration: 6000
           });
         } else if (data.blockchain) {
-          console.log('⚠️ Blockchain recording attempted but failed:', data.blockchain.error);
+          debugWarn('⚠️ Blockchain recording attempted but failed:', data.blockchain.error);
           
           showToast({
             title: '🎮 Game Session Started',
@@ -84,7 +85,7 @@ export default function Game() {
             duration: 5000
           });
         } else {
-          console.log('ℹ️ No blockchain data in response');
+          debugLog('ℹ️ No blockchain data in response');
           
           showToast({
             title: '🎮 Game Session Started',
@@ -94,7 +95,7 @@ export default function Game() {
           });
         }
       } else {
-        console.error('❌ API call failed:', data.error);
+        debugError('❌ API call failed:', data.error);
         
         showToast({
           title: '⚠️ Session Warning',
@@ -104,7 +105,7 @@ export default function Game() {
         });
       }
     } catch (error) {
-      console.error('❌ Error calling game start API:', error);
+      debugError('❌ Error calling game start API:', error);
       
       showToast({
         title: '❌ Connection Error',
@@ -120,25 +121,26 @@ export default function Game() {
     const baseUrl = UNITY_BUILDS.gameModes[gameMode];
     
     if (!baseUrl) {
-      console.error('❌ Invalid game mode:', gameMode);
+      debugError('❌ Invalid game mode:', gameMode);
       return '';
     }
 
     if (!walletAddress) {
-      console.warn('⚠️ Wallet address not available yet');
+      debugWarn('⚠️ Wallet address not available yet');
       return baseUrl;
     }
 
-    if (!token) {
-      console.warn(" token is required");
-      return baseUrl;
-    }
-
-    // Append wallet address as query parameter
+    const shouldIncludeUnityToken = String(import.meta.env.VITE_UNITY_INCLUDE_TOKEN || 'false').toLowerCase() === 'true';
+    // Always include wallet; include token only when explicitly enabled.
     const separator = baseUrl.includes('?') ? '&' : '?';
-    const fullUrl = `${baseUrl}${separator}wallet=${encodeURIComponent(walletAddress)}&token=${token}`;
-    
-    console.log('🎮 Unity build URL with wallet:', fullUrl);
+    const tokenParam = shouldIncludeUnityToken && token ? `&token=${encodeURIComponent(token)}` : '';
+    const fullUrl = `${baseUrl}${separator}wallet=${encodeURIComponent(walletAddress)}${tokenParam}`;
+
+    debugLog('🎮 Unity build URL prepared', {
+      mode: gameMode,
+      hasWallet: Boolean(walletAddress),
+      tokenForwardedToUnity: Boolean(tokenParam),
+    });
     return fullUrl;
   };
 
@@ -242,7 +244,7 @@ export default function Game() {
             className="unity-game-iframe"
             allow="autoplay; fullscreen; encrypted-media; gyroscope; accelerometer"
             onLoad={() => {
-              console.log('🎮 Unity game loaded');
+              debugLog('🎮 Unity game loaded');
               setIsLoading(false);
             }}
           />
