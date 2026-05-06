@@ -51,12 +51,12 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-ba
 const CAR_DATA = {
   0: { name: 'Coupe', image: CoupeImg, rarity: 'Common' },
   5: { name: 'Pickup', image: PickupImg, rarity: 'Common' },
-  6: { name: 'SUV', image: SUVImg, rarity: 'Rare' },
-  8: { name: 'Jeep', image: JeepImg, rarity: 'Epic' },
-  10: { name: 'Lamborghini', image: LamborghiniImg, rarity: 'Legendary' },
-  11: { name: 'CTR', image: CTRImg, rarity: 'Legendary' },
-  12: { name: 'Muscle', image: MuscleImg, rarity: 'Epic', price: 200 },
-  13: { name: 'F1', image: F1Img, rarity: 'Legendary', price: 250 }
+  // 6: { name: 'SUV', image: SUVImg, rarity: 'Rare' },
+  // 8: { name: 'Jeep', image: JeepImg, rarity: 'Epic' },
+  // 10: { name: 'Lamborghini', image: LamborghiniImg, rarity: 'Legendary' },
+  // 11: { name: 'CTR', image: CTRImg, rarity: 'Legendary' },
+  // 12: { name: 'Muscle', image: MuscleImg, rarity: 'Epic', price: 200 },
+  // 13: { name: 'F1', image: F1Img, rarity: 'Legendary', price: 250 }
 };
 
 // Get car name from index
@@ -833,7 +833,7 @@ function OverviewSection({ playerData, walletAddress, onRefresh }) {
             </p>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
             {contractEntries.map((entry) => {
               const shortAddress = `${entry.address.slice(0, 6)}...${entry.address.slice(-4)}`;
               return (
@@ -1241,13 +1241,89 @@ function LeaderboardSection({
 }
 
 function MarketplaceSection() {
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadAssets = async () => {
+      try {
+        setLoading(true);
+        const { data } = await apiInterceptor({ url: `/store/assets?t=${Date.now()}` });
+        if (!cancelled && data?.success) {
+          setAssets(Array.isArray(data.assets) ? data.assets : []);
+        }
+      } catch (err) {
+        if (!cancelled) setAssets([]);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void loadAssets();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="section">
+        <h2 className="section-title">CAR MARKETPLACE</h2>
+        <div className="cars-grid">
+          {Array.from({ length: 8 }).map((_, idx) => (
+            <div key={`skeleton-${idx}`} className="car-box">
+              <div className="car-visual" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '12px' }}>
+                <div className="loading-spinner" />
+              </div>
+              <div style={{ height: '18px', width: '70%', margin: '0.8rem auto', background: 'rgba(255,255,255,0.08)', borderRadius: '6px' }} />
+              <div style={{ height: '14px', width: '50%', margin: '0 auto 0.8rem', background: 'rgba(255,255,255,0.08)', borderRadius: '6px' }} />
+              <button className="select-btn" disabled>
+                Coming Soon
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="section">
       <h2 className="section-title">CAR MARKETPLACE</h2>
-      <div className="coming-soon">
-        <ShoppingCart size={64} />
-        <h3>Marketplace Opening Soon</h3>
-        <p>Buy, sell, and trade exclusive vehicles!</p>
+      <p className="section-subtitle">Assets are loaded from 0G Storage roots via backend manifest.</p>
+      <div className="cars-grid">
+        {assets.map((asset, index) => (
+          <motion.div
+            key={asset.id || asset.rootHash || index}
+            className="car-box"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: index * 0.06 }}
+            whileHover={{ y: -8 }}
+          >
+            <span className={`rarity-tag ${(asset.rarity || 'common').toLowerCase()}`}>{asset.rarity || 'Common'}</span>
+            <div className="car-visual">
+              <img src={asset.imageUrl} alt={asset.name || 'Asset'} className="car-image" loading="lazy" />
+            </div>
+            <h3>{asset.name || 'Asset'}</h3>
+            <p style={{ opacity: 0.85, marginBottom: '0.65rem' }}>
+              {asset.price ?? 0} {asset.currency || 'OG'}
+            </p>
+            <button className="select-btn" disabled>
+              Coming Soon
+            </button>
+          </motion.div>
+        ))}
+      </div>
+      {assets.length === 0 && (
+        <div className="coming-soon">
+          <ShoppingCart size={64} />
+          <h3>No assets available</h3>
+          <p>Store catalog is empty right now.</p>
+        </div>
+      )}
+      <div style={{ marginTop: '1rem', opacity: 0.75, fontSize: '0.9rem' }}>
+        Every image card above is served from 0G by root hash.
       </div>
     </div>
   );
