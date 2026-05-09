@@ -20,6 +20,17 @@ export const useWallet = () => {
   return context;
 };
 
+// Prefer MetaMask when multiple wallet extensions are injected
+function getPreferredProvider() {
+  const providers = window.ethereum?.providers;
+  if (Array.isArray(providers) && providers.length > 0) {
+    return providers.find(p => p.isMetaMask && !p.isZerion && !p.isCoinbaseWallet)
+      || providers.find(p => p.isMetaMask)
+      || providers[0];
+  }
+  return window.ethereum;
+}
+
 export const WalletProvider = ({ children }) => {
   const [account, setAccount] = useState(null);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -36,26 +47,24 @@ export const WalletProvider = ({ children }) => {
     return Number(chainId) === ZERO_G_CHAIN_ID_DEC;
   };
 
-  const ensureZeroGChain = async () => {
-    if (!window.ethereum) return false;
+  const ensureZeroGChain = async (eth) => {
+    if (!eth) return false;
     try {
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainId = await eth.request({ method: 'eth_chainId' });
       if (isZeroGChainId(chainId)) return true;
       try {
-        await window.ethereum.request({
+        await eth.request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: ZERO_G_CHAIN_ID_HEX }],
         });
         return true;
       } catch (switchError) {
         if (switchError?.code === 4902) {
-          await window.ethereum.request({
+          await eth.request({
             method: 'wallet_addEthereumChain',
             params: [zeroGChainParams],
           });
-          const nextChainId = await window.ethereum.request({
-            method: 'eth_chainId',
-          });
+          const nextChainId = await eth.request({ method: 'eth_chainId' });
           return isZeroGChainId(nextChainId);
         }
         if (switchError?.code === 4001) {
@@ -81,26 +90,23 @@ export const WalletProvider = ({ children }) => {
       return;
     }
     setError(null);
-    if (window.ethereum) {
-      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
-      setProvider(ethersProvider);
+    const eth = getPreferredProvider();
+    if (eth) {
+      setProvider(new ethers.BrowserProvider(eth));
     }
   };
 
   useEffect(() => {
-    // Check if already connected
     checkIfWalletIsConnected();
-
-    // Listen for account changes
-    if (window.ethereum) {
-      window.ethereum.on('accountsChanged', handleAccountsChanged);
-      window.ethereum.on('chainChanged', handleChainChanged);
+    const eth = getPreferredProvider();
+    if (eth) {
+      eth.on('accountsChanged', handleAccountsChanged);
+      eth.on('chainChanged', handleChainChanged);
     }
-
     return () => {
-      if (window.ethereum) {
-        window.ethereum.removeListener('accountsChanged', handleAccountsChanged);
-        window.ethereum.removeListener('chainChanged', handleChainChanged);
+      if (eth) {
+        eth.removeListener('accountsChanged', handleAccountsChanged);
+        eth.removeListener('chainChanged', handleChainChanged);
       }
     };
   }, []);
@@ -116,26 +122,23 @@ export const WalletProvider = ({ children }) => {
 
   const checkIfWalletIsConnected = async () => {
     try {
-      if (!window.ethereum) {
-        console.log('MetaMask not detected');
+      const eth = getPreferredProvider();
+      if (!eth) {
+        console.log('No wallet detected');
         return;
       }
-
-      const chainId = await window.ethereum.request({ method: 'eth_chainId' });
+      const chainId = await eth.request({ method: 'eth_chainId' });
       if (!isZeroGChainId(chainId)) {
         setError('Please switch to 0G Mainnet to continue.');
         setAccount(null);
         setProvider(null);
         return;
       }
-
-      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
-      
+      const accounts = await eth.request({ method: 'eth_accounts' });
       if (accounts.length > 0) {
         setError(null);
         setAccount(accounts[0]);
-        const ethersProvider = new ethers.BrowserProvider(window.ethereum);
-        setProvider(ethersProvider);
+        setProvider(new ethers.BrowserProvider(eth));
       }
     } catch (err) {
       console.error('Error checking wallet connection:', err);
@@ -146,26 +149,20 @@ export const WalletProvider = ({ children }) => {
     try {
       setIsConnecting(true);
       setError(null);
-
-      if (!window.ethereum) {
+      const eth = getPreferredProvider();
+      if (!eth) {
         setError('MetaMask is not installed. Please install it to continue.');
         return;
       }
-
-      const accounts = await window.ethereum.request({
-        method: 'eth_requestAccounts',
-      });
-
-      const isOnZeroG = await ensureZeroGChain();
+      const accounts = await eth.request({ method: 'eth_requestAccounts' });
+      const isOnZeroG = await ensureZeroGChain(eth);
       if (!isOnZeroG) {
         setAccount(null);
         setProvider(null);
         return;
       }
-
       setAccount(accounts[0]);
-      const ethersProvider = new ethers.BrowserProvider(window.ethereum);
-      setProvider(ethersProvider);
+      setProvider(new ethers.BrowserProvider(eth));
     } catch (err) {
       console.error('Error connecting wallet:', err);
       setError(err.message || 'Failed to connect wallet');

@@ -25,7 +25,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import SynthwaveBackground from '../components/SynthwaveBackground';
-import { logout as clearAuth, apiInterceptor } from '../api/auth';
+import { logout as clearAuth, apiInterceptor, getJwtWalletAddress } from '../api/auth';
+import { fetchMarketplaceAssets, fetchUserPurchases, verifyPurchase } from '../api/marketplace';
+import { ethers } from 'ethers';
+import { usePrivyWalletTools } from '../hooks/usePrivyWalletTools';
 import './DriverLicense.css';
 
 // Import game assets
@@ -48,15 +51,16 @@ import F1Img from '../assets/f1.png';
 const API_BASE = import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-backend.onrender.com/api';
 
 // Car mapping based on backend indices
+// free = always available; marketplaceId = must be purchased in marketplace
 const CAR_DATA = {
-  0: { name: 'Coupe', image: CoupeImg, rarity: 'Common' },
-  5: { name: 'Pickup', image: PickupImg, rarity: 'Common' },
-  // 6: { name: 'SUV', image: SUVImg, rarity: 'Rare' },
-  // 8: { name: 'Jeep', image: JeepImg, rarity: 'Epic' },
-  // 10: { name: 'Lamborghini', image: LamborghiniImg, rarity: 'Legendary' },
-  // 11: { name: 'CTR', image: CTRImg, rarity: 'Legendary' },
-  // 12: { name: 'Muscle', image: MuscleImg, rarity: 'Epic', price: 200 },
-  // 13: { name: 'F1', image: F1Img, rarity: 'Legendary', price: 250 }
+  0:  { name: 'Coupe',       image: CoupeImg,       rarity: 'Common',    free: true },
+  5:  { name: 'Pickup',      image: PickupImg,       rarity: 'Common',    free: true },
+  6:  { name: 'SUV',         image: SUVImg,          rarity: 'Rare',      marketplaceId: 'suv' },
+  8:  { name: 'Jeep',        image: JeepImg,         rarity: 'Epic',      marketplaceId: 'jeep' },
+  10: { name: 'Lamborghini', image: LamborghiniImg,  rarity: 'Legendary', marketplaceId: 'lamborghini' },
+  11: { name: 'CTR',         image: CTRImg,          rarity: 'Legendary', marketplaceId: 'ctr' },
+  12: { name: 'Muscle',      image: MuscleImg,       rarity: 'Epic',      marketplaceId: 'muscle' },
+  13: { name: 'F1',          image: F1Img,           rarity: 'Legendary', marketplaceId: 'f1' },
 };
 
 // Get car name from index
@@ -65,7 +69,7 @@ const getCarName = (index) => {
 };
 
 export default function DriverLicense() {
-  const { account, disconnectWallet } = useWallet();
+  const { account, provider, disconnectWallet } = useWallet();
   const { logout: privyLogout } = usePrivy();
   const { showToast } = useBlockchainToast(); // NEW HOOK
   const navigate = useNavigate();
@@ -90,8 +94,9 @@ export default function DriverLicense() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const commentPingKeyRef = useRef('');
 
-  // Get wallet address
-  const walletAddress = account || localStorage.getItem('walletAddress');
+  // JWT wallet address is authoritative for API calls (enforceAuthIdentity requires it to match).
+  // Fall back to WalletContext/localStorage only for display.
+  const walletAddress = getJwtWalletAddress() || account || localStorage.getItem('walletAddress');
 
   // Load player data — call whenever wallet is ready; token attached automatically if present
   useEffect(() => {
@@ -109,6 +114,12 @@ export default function DriverLicense() {
   useEffect(() => {
     fireLeaderboardCommentPing();
   }, [activeSection, leaderboardData, leaderboardType, playerData]);
+
+  useEffect(() => {
+    const handler = (e) => setActiveSection(e.detail);
+    window.addEventListener('navigate-section', handler);
+    return () => window.removeEventListener('navigate-section', handler);
+  }, []);
 
   const loadPlayerData = async () => {
     try {
@@ -272,7 +283,7 @@ export default function DriverLicense() {
       case 'overview':
         return <OverviewSection playerData={playerData} walletAddress={walletAddress} onRefresh={handleRefresh} />;
       case 'garage':
-        return <GarageSection playerData={playerData} />;
+        return <GarageSection playerData={playerData} account={walletAddress} provider={provider} />;
       case 'leaderboard':
         return (
           <LeaderboardSection
@@ -928,13 +939,14 @@ function StatBox({ icon, label, value }) {
   );
 }
 
-// UPDATED GarageSection with blockchain toast
-function GarageSection({ playerData }) {
-  const { showToast } = useBlockchainToast(); // NEW HOOK
+// UPDATED GarageSection with blockchain toast + marketplace ownership
+function GarageSection({ playerData, account, provider }) {
+  const { showToast } = useBlockchainToast();
   const [selectedCarIndex, setSelectedCarIndex] = useState(playerData?.playerVehicleData?.selectedPlayerCarIndex || 0);
   const [isSelecting, setIsSelecting] = useState(false);
-  
-  const walletAddress = localStorage.getItem('walletAddress');
+  const [ownedIds, setOwnedIds] = useState([]);
+
+  const walletAddress = getJwtWalletAddress() || account || localStorage.getItem('walletAddress');
 
   useEffect(() => {
     if (playerData?.playerVehicleData?.selectedPlayerCarIndex !== undefined) {
@@ -942,15 +954,15 @@ function GarageSection({ playerData }) {
     }
   }, [playerData]);
 
-  // UPDATED: Handle car selection with toast
+  useEffect(() => {
+    if (!walletAddress) return;
+    fetchUserPurchases(walletAddress).then(setOwnedIds).catch(() => {});
+  }, [walletAddress]);
+
   const handleSelectCar = async (carIndex) => {
-    if (carIndex === selectedCarIndex || isSelecting) {
-      return;
-    }
+    if (carIndex === selectedCarIndex || isSelecting) return;
 
     setIsSelecting(true);
-    console.log(`🚗 Selecting car index: ${carIndex}`);
-
     try {
       const timestamp = Date.now();
       const { data } = await apiInterceptor({
@@ -958,12 +970,9 @@ function GarageSection({ playerData }) {
         url: `/player/vehicle?user=${walletAddress}&t=${timestamp}`,
         data: { selectedPlayerCarIndex: carIndex },
       });
-      
+
       if (data.success) {
         setSelectedCarIndex(carIndex);
-        console.log(`✅ Car selected successfully: ${CAR_DATA[carIndex].name} (index ${carIndex})`);
-        
-        // NEW: Show toast notification with blockchain data
         showToast({
           title: '🚗 Vehicle Switched',
           description: `Equipped ${CAR_DATA[carIndex].name}`,
@@ -971,11 +980,10 @@ function GarageSection({ playerData }) {
           duration: 6000
         });
       } else {
-        console.error('❌ Failed to select car:', data);
         alert('Failed to select car. Please try again.');
       }
     } catch (error) {
-      console.error('❌ Error selecting car:', error);
+      console.error('Error selecting car:', error);
       alert('Error selecting car. Please check your connection.');
     } finally {
       setIsSelecting(false);
@@ -984,11 +992,16 @@ function GarageSection({ playerData }) {
 
   const cars = Object.keys(CAR_DATA).map(index => {
     const carIndex = parseInt(index);
+    const entry = CAR_DATA[carIndex];
+    const isOwned = entry.free || (entry.marketplaceId && ownedIds.includes(entry.marketplaceId));
     return {
       id: carIndex,
-      name: CAR_DATA[carIndex].name,
-      image: CAR_DATA[carIndex].image,
-      rarity: CAR_DATA[carIndex].rarity
+      name: entry.name,
+      image: entry.image,
+      rarity: entry.rarity,
+      free: entry.free || false,
+      marketplaceId: entry.marketplaceId || null,
+      isOwned,
     };
   });
 
@@ -996,36 +1009,50 @@ function GarageSection({ playerData }) {
     <div className="section">
       <h2 className="section-title">MY GARAGE</h2>
       <p className="section-subtitle">Select your vehicle for the next race</p>
-      
+
       <div className="cars-grid">
         {cars.map((car, index) => {
           const isSelected = selectedCarIndex === car.id;
-          
+          const locked = !car.isOwned;
+
           return (
             <motion.div
               key={car.id}
-              className={`car-box ${isSelected ? 'selected' : ''} ${isSelecting ? 'selecting' : ''}`}
+              className={`car-box ${isSelected ? 'selected' : ''} ${locked ? 'locked' : ''} ${isSelecting ? 'selecting' : ''}`}
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: index * 0.1 }}
-              whileHover={{ y: isSelected ? 0 : -8 }}
+              whileHover={{ y: isSelected || locked ? 0 : -8 }}
             >
               <span className={`rarity-tag ${car.rarity.toLowerCase()}`}>{car.rarity}</span>
-              {isSelected && <span className="selected-tag">SELECTED</span>}
-              
-              <div className="car-visual">
-                <img src={car.image} alt={car.name} className="car-image" />
+              {isSelected && !locked && <span className="selected-tag">SELECTED</span>}
+              {locked && <span className="locked-tag">LOCKED</span>}
+
+              <div className={`car-visual ${locked ? 'car-visual--locked' : ''}`}>
+                <img src={car.image} alt={car.name} className="car-image" style={locked ? { filter: 'grayscale(1) opacity(0.45)' } : {}} />
+                {locked && (
+                  <div className="lock-overlay">🔒</div>
+                )}
               </div>
-              
+
               <h3>{car.name}</h3>
-              
-              {isSelected ? (
-                <button className="select-btn active" disabled>
-                  EQUIPPED
+
+              {locked ? (
+                <button
+                  className="select-btn locked-btn"
+                  onClick={() => {
+                    // Switch to marketplace tab
+                    const event = new CustomEvent('navigate-section', { detail: 'marketplace' });
+                    window.dispatchEvent(event);
+                  }}
+                >
+                  BUY IN MARKETPLACE
                 </button>
+              ) : isSelected ? (
+                <button className="select-btn active" disabled>EQUIPPED</button>
               ) : (
-                <button 
-                  className="select-btn" 
+                <button
+                  className="select-btn"
                   onClick={() => handleSelectCar(car.id)}
                   disabled={isSelecting}
                 >
@@ -1240,46 +1267,131 @@ function LeaderboardSection({
   );
 }
 
-function MarketplaceSection() {
-  const [assets, setAssets] = useState([]);
-  const [loading, setLoading] = useState(true);
+const MARKETPLACE_CONTRACT = import.meta.env.VITE_MARKETPLACE_CONTRACT_ADDRESS;
+const PURCHASE_ABI = [
+  'function purchaseAsset(bytes32 assetHash, string userIdentifier) external payable',
+];
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadAssets = async () => {
-      try {
-        setLoading(true);
-        const { data } = await apiInterceptor({ url: `/store/assets?t=${Date.now()}` });
-        if (!cancelled && data?.success) {
-          setAssets(Array.isArray(data.assets) ? data.assets : []);
-        }
-      } catch (err) {
-        if (!cancelled) setAssets([]);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    };
-    void loadAssets();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+// Prefer MetaMask when multiple wallets are injected (avoids Zerion/other interceptors)
+function getPreferredEthereumProvider() {
+  const providers = window.ethereum?.providers;
+  if (Array.isArray(providers) && providers.length > 0) {
+    return providers.find(p => p.isMetaMask && !p.isZerion && !p.isCoinbaseWallet)
+      || providers.find(p => p.isMetaMask)
+      || providers[0];
+  }
+  return window.ethereum;
+}
+
+// Maps marketplace asset IDs to local images already bundled
+const LOCAL_IMAGES = {
+  ctr: CTRImg,
+  f1: F1Img,
+  jeep: JeepImg,
+  lamborghini: LamborghiniImg,
+  muscle: MuscleImg,
+  suv: SUVImg,
+};
+
+function MarketplaceSection() {
+  const { showToast } = useBlockchainToast();
+  const { canUsePrivy, activeWallet, sendPrivyTransaction, switchToZeroG, allowedChain } = usePrivyWalletTools();
+  const walletAddress = activeWallet?.address || localStorage.getItem('walletAddress');
+
+  const [assets, setAssets] = useState([]);
+  const [ownedIds, setOwnedIds] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [buying, setBuying] = useState(null);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [list, owned] = await Promise.all([
+        fetchMarketplaceAssets(),
+        walletAddress ? fetchUserPurchases(walletAddress) : Promise.resolve([]),
+      ]);
+      setAssets(list.filter(a => a.isActive));
+      setOwnedIds(owned);
+    } catch (err) {
+      console.error('Marketplace load error:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, [walletAddress]);
+
+  const handleBuy = async (asset) => {
+    if (!canUsePrivy || !activeWallet?.address) {
+      showToast({ title: '🔌 Wallet required', description: 'Connect your wallet to purchase.', duration: 4000 });
+      return;
+    }
+    if (!MARKETPLACE_CONTRACT) {
+      showToast({ title: '⚠️ Config error', description: 'Marketplace contract not configured.', duration: 4000 });
+      return;
+    }
+    if (buying) return;
+    setBuying(asset.id);
+    try {
+      // Step 1: Switch to 0G via Privy (works for MetaMask, Coinbase, embedded wallets)
+      await switchToZeroG();
+
+      // Step 2: Encode purchaseAsset call — always lowercase so hasPurchased check matches
+      const userIdentifier = activeWallet.address.toLowerCase();
+      const iface = new ethers.Interface(PURCHASE_ABI);
+      const data = iface.encodeFunctionData('purchaseAsset', [asset.hash, userIdentifier]);
+
+      showToast({ title: '⏳ Confirm in wallet', description: `Purchasing ${asset.name} for ${asset.price} OG…`, duration: 8000 });
+
+      // Step 3: Send via Privy — works for MetaMask, Coinbase, embedded wallets through one API
+      const receipt = await sendPrivyTransaction(
+        {
+          to: MARKETPLACE_CONTRACT,
+          value: BigInt(asset.priceWei),
+          data,
+          chainId: allowedChain.decimalChainId,
+        },
+        {
+          address: activeWallet.address,
+          uiOptions: { showWalletUIs: true },
+        },
+      );
+
+      const txHash = typeof receipt === 'string' ? receipt : receipt?.transactionHash || receipt?.hash;
+
+      showToast({ title: '📡 Transaction sent', description: 'Waiting for confirmation…', txHash, duration: 10000 });
+
+      // Verify on backend
+      await verifyPurchase({ txHash, assetId: asset.id, userIdentifier });
+
+      setOwnedIds(prev => [...new Set([...prev, asset.id])]);
+      showToast({
+        title: `🚗 ${asset.name} unlocked!`,
+        description: `Purchase confirmed on 0G. Head to the Garage to equip it.`,
+        txHash,
+        duration: 8000,
+      });
+    } catch (err) {
+      const msg = err?.reason || err?.message || 'Purchase failed';
+      showToast({ title: '❌ Purchase failed', description: msg.slice(0, 120), duration: 6000 });
+    } finally {
+      setBuying(null);
+    }
+  };
 
   if (loading) {
     return (
       <div className="section">
         <h2 className="section-title">CAR MARKETPLACE</h2>
         <div className="cars-grid">
-          {Array.from({ length: 8 }).map((_, idx) => (
-            <div key={`skeleton-${idx}`} className="car-box">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div key={`sk-${idx}`} className="car-box">
               <div className="car-visual" style={{ background: 'rgba(255,255,255,0.04)', borderRadius: '12px' }}>
                 <div className="loading-spinner" />
               </div>
               <div style={{ height: '18px', width: '70%', margin: '0.8rem auto', background: 'rgba(255,255,255,0.08)', borderRadius: '6px' }} />
               <div style={{ height: '14px', width: '50%', margin: '0 auto 0.8rem', background: 'rgba(255,255,255,0.08)', borderRadius: '6px' }} />
-              <button className="select-btn" disabled>
-                Coming Soon
-              </button>
+              <button className="select-btn" disabled>Loading…</button>
             </div>
           ))}
         </div>
@@ -1290,41 +1402,75 @@ function MarketplaceSection() {
   return (
     <div className="section">
       <h2 className="section-title">CAR MARKETPLACE</h2>
-      <p className="section-subtitle">Assets are loaded from 0G Storage roots via backend manifest.</p>
+      <p className="section-subtitle">
+        Vehicles are registered on 0G EVM · Metadata stored on 0G DA
+      </p>
       <div className="cars-grid">
-        {assets.map((asset, index) => (
-          <motion.div
-            key={asset.id || asset.rootHash || index}
-            className="car-box"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.06 }}
-            whileHover={{ y: -8 }}
-          >
-            <span className={`rarity-tag ${(asset.rarity || 'common').toLowerCase()}`}>{asset.rarity || 'Common'}</span>
-            <div className="car-visual">
-              <img src={asset.imageUrl} alt={asset.name || 'Asset'} className="car-image" loading="lazy" />
-            </div>
-            <h3>{asset.name || 'Asset'}</h3>
-            <p style={{ opacity: 0.85, marginBottom: '0.65rem' }}>
-              {asset.price ?? 0} {asset.currency || 'OG'}
-            </p>
-            <button className="select-btn" disabled>
-              Coming Soon
-            </button>
-          </motion.div>
-        ))}
+        {assets.map((asset, index) => {
+          const owned = ownedIds.includes(asset.id);
+          const isBuying = buying === asset.id;
+          const img = LOCAL_IMAGES[asset.id];
+          return (
+            <motion.div
+              key={asset.id}
+              className="car-box"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: index * 0.06 }}
+              whileHover={{ y: owned ? 0 : -8 }}
+            >
+              <span className={`rarity-tag ${(asset.rarity || 'common').toLowerCase()}`}>
+                {asset.rarity || 'Common'}
+              </span>
+              {owned && (
+                <span style={{
+                  position: 'absolute', top: '0.5rem', right: '0.5rem',
+                  background: 'rgba(0,220,130,0.15)', color: '#00dc82',
+                  border: '1px solid rgba(0,220,130,0.35)',
+                  borderRadius: '6px', fontSize: '0.65rem', fontWeight: 700,
+                  padding: '2px 8px', letterSpacing: '0.05em',
+                }}>OWNED</span>
+              )}
+              <div className="car-visual">
+                {img
+                  ? <img src={img} alt={asset.name} className="car-image" />
+                  : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0.3 }}>
+                      <Car size={48} />
+                    </div>
+                }
+              </div>
+              <h3>{asset.name}</h3>
+              <p style={{ opacity: 0.85, marginBottom: '0.65rem', fontSize: '1rem', fontWeight: 700, color: '#00d4ff' }}>
+                {asset.price} OG
+              </p>
+              {owned ? (
+                <button className="select-btn" disabled style={{ background: 'rgba(0,220,130,0.15)', color: '#00dc82', border: '1px solid rgba(0,220,130,0.35)' }}>
+                  ✓ Owned
+                </button>
+              ) : (
+                <button
+                  className="select-btn"
+                  disabled={isBuying || !canUsePrivy}
+                  onClick={() => handleBuy(asset)}
+                  style={isBuying ? { opacity: 0.6 } : {}}
+                >
+                  {isBuying ? 'Processing…' : `Buy · ${asset.price} OG`}
+                </button>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
       {assets.length === 0 && (
         <div className="coming-soon">
           <ShoppingCart size={64} />
           <h3>No assets available</h3>
-          <p>Store catalog is empty right now.</p>
+          <p>Check back soon for new vehicles.</p>
         </div>
       )}
-      <div style={{ marginTop: '1rem', opacity: 0.75, fontSize: '0.9rem' }}>
-        Every image card above is served from 0G by root hash.
-      </div>
+      <p style={{ marginTop: '1rem', opacity: 0.4, fontSize: '0.78rem', textAlign: 'center' }}>
+        Purchases are on-chain · 0G Mainnet (chainId 16661)
+      </p>
     </div>
   );
 }

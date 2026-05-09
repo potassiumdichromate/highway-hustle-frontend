@@ -282,9 +282,55 @@ export const getAuthToken = () => {
 };
 
 /**
+ * Get the wallet address encoded in the current JWT.
+ * This is the authoritative identity the backend enforces on all requests.
+ * Use this for ?user= params instead of localStorage.walletAddress or WalletContext.account.
+ */
+export const getJwtWalletAddress = () => {
+  if (typeof window === 'undefined') return null;
+  const token = localStorage.getItem('token');
+  const payload = decodeJwtPayload(token);
+  return payload?.walletAddress || payload?.identifier || null;
+};
+
+/**
  * Get stored username
  */
 export const getUsername = () => {
   if (typeof window === 'undefined') return null;
   return localStorage.getItem('username');
+};
+
+// ── SIWE helpers ──────────────────────────────────────────────────────────────
+
+const getApiBase = () =>
+  (import.meta.env.VITE_API_BASE_URL || 'https://highway-hustle-backend.onrender.com/api');
+
+export const getSiweNonce = async (address) => {
+  const res = await fetch(
+    `${getApiBase()}/player/auth/siwe-nonce?address=${encodeURIComponent(address)}`,
+  );
+  if (!res.ok) throw new Error(`nonce request failed: ${res.status}`);
+  const data = await res.json();
+  if (!data?.nonce) throw new Error('server returned no nonce');
+  return data.nonce;
+};
+
+export const loginWithSiwe = async (message, signature) => {
+  const res = await fetch(`${getApiBase()}/player/auth/siwe-login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, signature }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error || `SIWE login failed: ${res.status}`);
+  }
+  const data = await res.json();
+  const token = data?.data?.token;
+  if (token && typeof window !== 'undefined') {
+    localStorage.setItem('token', token);
+    window.dispatchEvent(new CustomEvent('presence:token-change', { detail: token }));
+  }
+  return data;
 };

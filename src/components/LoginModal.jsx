@@ -11,12 +11,14 @@ import {
   useLoginWithOAuth,
   usePrivy,
 } from '@privy-io/react-auth';
+import { SiweMessage } from 'siwe';
 import {
   getAuthSession,
   getAuthUser,
   isSessionActive,
   setAuthSession,
 } from '../lib/authSession';
+import { getSiweNonce, loginWithSiwe } from '../api/auth';
 import {
   connectGateWallet,
   getGateWalletCurrentNetwork,
@@ -765,24 +767,53 @@ function LoginModal({ open, onClose, logoSrc }) {
     const expectedChainId = String(allowedChain.decimalChainId);
     if (walletChainId === expectedChainId) return true;
 
+    // Try Privy's switchChain first
     if (wallet?.switchChain) {
       try {
-        console.log('[LoginModal] Switching wallet to 0G Mainnet', {
-          source,
-          from: wallet?.chainId || 'unknown',
-          to: allowedChain.hexChainId,
-        });
+        console.log('[LoginModal] Switching wallet to 0G Mainnet via Privy', { source, from: wallet?.chainId || 'unknown' });
         await wallet.switchChain(allowedChain.hexChainId);
         return true;
       } catch (err) {
-        console.error('[LoginModal] Failed to switch wallet to 0G', {
-          source,
-          error: err?.message || err,
-        });
+        console.warn('[LoginModal] Privy switchChain failed, trying window.ethereum fallback', err?.message);
       }
     }
 
-    setError('Please switch to 0G Mainnet in your wallet to continue.');
+    // Fallback: use window.ethereum directly (handles adding the chain if unknown)
+    if (window.ethereum) {
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: allowedChain.hexChainId }],
+        });
+        return true;
+      } catch (switchErr) {
+        if (switchErr?.code === 4902) {
+          // Chain not added yet — add it
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [{
+                chainId: allowedChain.hexChainId,
+                chainName: allowedChain.chainName,
+                nativeCurrency: { name: '0G', symbol: '0G', decimals: 18 },
+                rpcUrls: allowedChain.rpcUrls,
+                blockExplorerUrls: allowedChain.blockExplorerUrls,
+              }],
+            });
+            return true;
+          } catch (addErr) {
+            console.error('[LoginModal] Failed to add 0G chain', addErr?.message);
+          }
+        } else if (switchErr?.code === 4001) {
+          setError('Please switch to 0G Mainnet to continue.');
+          return false;
+        } else {
+          console.error('[LoginModal] wallet_switchEthereumChain failed', switchErr?.message);
+        }
+      }
+    }
+
+    setError('Please switch to 0G Mainnet (chainId 16661) in your wallet to continue.');
     return false;
   };
 
@@ -1208,6 +1239,29 @@ function LoginModal({ open, onClose, logoSrc }) {
       try {
         const onZeroG = await ensureWalletOnZeroG(resolvedWallet, 'wallet');
         if (!onZeroG) return;
+
+        // SIWE — prove wallet ownership before the backend registers this session.
+        // Uses the Privy wallet's signMessage so no separate MetaMask prompt appears.
+        try {
+          const nonce = await getSiweNonce(address);
+          const siweMsg = new SiweMessage({
+            domain: window.location.host,
+            address,
+            statement: 'Sign in to Highway Hustle',
+            uri: window.location.origin,
+            version: '1',
+            chainId: 16661,
+            nonce,
+          });
+          const messageText = siweMsg.prepareMessage();
+          const signature = await resolvedWallet.signMessage(messageText);
+          await loginWithSiwe(messageText, signature);
+          console.log('[LoginModal] SIWE login succeeded', { address: summarizeAddress(address) });
+        } catch (siweErr) {
+          // Non-fatal: fall through to the existing recordPrivyLogin path.
+          console.warn('[LoginModal] SIWE failed, falling back to direct login:', siweErr.message);
+        }
+
         const walletType =
           resolvedWallet?.walletClientType ||
           resolvedWallet?.connectorType ||
