@@ -33,3 +33,8 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Project specific
+pixel-perfect-page-main
+.env
+legacy-frontend-archive.zip
