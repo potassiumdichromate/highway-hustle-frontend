@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useLoginWithEmail, usePrivy } from "@privy-io/react-auth";
+import { useLoginWithEmail, usePrivy, useLoginWithOAuth } from "@privy-io/react-auth";
 import { X, Mail, Wallet } from "lucide-react";
 import logo from "@/assets/logo-flame.png";
 
@@ -10,6 +10,7 @@ interface CustomLoginModalProps {
 
 export default function CustomLoginModal({ isOpen, onClose }: CustomLoginModalProps) {
   const { authenticated, login } = usePrivy();
+  const { loginWithOAuth } = useLoginWithOAuth();
   const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -55,13 +56,13 @@ export default function CustomLoginModal({ isOpen, onClose }: CustomLoginModalPr
   };
 
   const handleWalletLogin = () => {
-    // login() opens Privy's modal which handles wallet selection + SIWE signing
-    // This is the correct way to LOGIN (not just connect) with a wallet
-    login();
+    // Show only wallet options in the Privy modal
+    login({ loginMethods: ["wallet"] });
   };
 
   const handleGoogleLogin = () => {
-    login();
+    // Trigger Google OAuth directly
+    loginWithOAuth({ provider: "google" });
   };
 
   return (
