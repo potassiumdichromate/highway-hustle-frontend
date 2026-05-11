@@ -70,6 +70,7 @@ function ProfilePage() {
   const [sessionCount, setSessionCount] = useState<number>(0);
   const [achievementCount, setAchievementCount] = useState<number>(0);
   const [daStatus, setDaStatus] = useState<string>("Not Submitted");
+  const [daData, setDaData] = useState<any>(null);
   const [isZeroGLoading, setIsZeroGLoading] = useState(false);
 
   const identifier = useMemo(() => {
@@ -121,6 +122,11 @@ function ProfilePage() {
 
         const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
         
+        if (!user) {
+          setIsLoading(false);
+          return;
+        }
+
         // 1. Force a login sync
         const loginResponse = await fetch(`${baseUrl}/player/login`, {
           method: "POST",
@@ -162,7 +168,7 @@ function ProfilePage() {
       setIsZeroGLoading(true);
       try {
         const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
-        const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+        const headers: Record<string, string> = token ? { "Authorization": `Bearer ${token}` } : {};
 
         const [sessionRes, achievementRes, daRes] = await Promise.all([
           fetch(`${baseUrl}/blockchain/session-count?user=${id}`, { headers }),
@@ -176,8 +182,11 @@ function ProfilePage() {
         const achievementData = await achievementRes.json();
         if (achievementData.success && achievementData.hasAchievement) setAchievementCount(1);
 
-        const daData = await daRes.json();
-        if (daData.success) setDaStatus(daData.daStatus || "Not Submitted");
+        const daDataResult = await daRes.json();
+        if (daDataResult.success) {
+          setDaStatus(daDataResult.snapshot?.daStatus || "Not Submitted");
+          setDaData(daDataResult.snapshot);
+        }
 
       } catch (err) {
         console.warn("⚠️ Failed to fetch some 0G stats:", err);
@@ -459,35 +468,110 @@ function ProfilePage() {
           </div>
         </section>
 
-        {/* Contract Addresses */}
+        {/* 0G Network Integration Registry */}
+        {/* 0G Network Contracts Section */}
         <section className="mb-12">
           <div className="flex items-center gap-3 mb-8">
-             <h3 className="font-display text-lg font-black tracking-[0.3em] text-white uppercase italic">0G Network Contracts</h3>
-             <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
+            <h3 className="font-display text-lg font-black tracking-[0.3em] text-white uppercase italic">0G Protocol Registry</h3>
+            <div className="h-px flex-1 bg-gradient-to-r from-white/10 to-transparent" />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {CONTRACTS.map((contract) => (
-              <div key={contract.address} className="rounded-xl border border-white/5 bg-[#0a0a1a] p-6 hover:border-neon-cyan/30 transition group relative overflow-hidden">
-                <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition">
-                   <ExternalLink className="h-10 w-10" />
-                </div>
-                <div className="flex flex-col h-full relative z-10">
-                  <h4 className="text-xs font-black tracking-[0.2em] text-white uppercase mb-2 italic">{contract.name}</h4>
-                  <p className="text-[10px] text-muted-foreground mb-4 uppercase font-bold opacity-60 leading-relaxed">{contract.purpose}</p>
-                  <div className="mt-auto flex items-center justify-between">
-                    <code className="text-[10px] font-mono text-neon-cyan/70">{contract.address.slice(0, 8)}...{contract.address.slice(-6)}</code>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Contracts List */}
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black tracking-[0.4em] text-muted-foreground uppercase mb-6 px-2">Core Smart Contracts</h4>
+              {CONTRACTS.map((contract) => (
+                <div key={contract.address} className="group flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border border-white/5 bg-[#0a0a1a]/40 backdrop-blur-md transition hover:border-neon-cyan/20">
+                  <div className="flex items-center gap-4">
+                    <div className="h-10 w-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-neon-cyan group-hover:scale-110 transition-transform">
+                      <Shield className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-black text-white uppercase tracking-wider">{contract.name}</p>
+                      <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">{contract.purpose}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <code className="text-[10px] font-mono text-muted-foreground/60 bg-black/40 px-2 py-1 rounded border border-white/5">
+                      {contract.address.slice(0, 6)}...{contract.address.slice(-4)}
+                    </code>
                     <a 
                       href={`https://chainscan.0g.ai/address/${contract.address}`} 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="p-1.5 rounded-md bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-white transition"
+                      className="p-2 rounded-lg bg-white/5 hover:bg-neon-cyan/20 text-muted-foreground hover:text-neon-cyan transition-colors"
                     >
-                      <ExternalLink className="h-3 w-3" />
+                      <ExternalLink className="h-4 w-4" />
                     </a>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+
+            {/* DA Verifiable Proof Section */}
+            <div className="space-y-6">
+               <h4 className="text-[10px] font-black tracking-[0.4em] text-muted-foreground uppercase mb-6 px-2">Verifiable 0G DA Proof</h4>
+               <div className="relative overflow-hidden rounded-3xl border border-neon-pink/20 bg-neon-pink/[0.02] p-8 backdrop-blur-xl">
+                  <div className="absolute top-0 right-0 p-8 opacity-5">
+                    <Dna className="h-32 w-32 text-neon-pink" />
+                  </div>
+                  
+                  <div className="relative z-10 space-y-8">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <CircleDot className={`h-4 w-4 ${daStatus === 'finalized' ? 'text-neon-green animate-pulse' : 'text-neon-pink'}`} />
+                        <span className="text-xs font-black tracking-[0.2em] text-white uppercase italic">DA Snapshot Status</span>
+                      </div>
+                      <span className={`px-3 py-1 rounded-full text-[9px] font-black tracking-widest uppercase border ${
+                        daStatus === 'finalized' ? 'border-neon-green/30 bg-neon-green/10 text-neon-green' : 
+                        daStatus === 'confirmed' ? 'border-neon-cyan/30 bg-neon-cyan/10 text-neon-cyan' : 
+                        'border-neon-pink/30 bg-neon-pink/10 text-neon-pink'
+                      }`}>
+                        {daStatus}
+                      </span>
+                    </div>
+
+                    <div className="space-y-6">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[9px] font-black text-muted-foreground tracking-[0.2em] uppercase italic">DA Event ID</p>
+                          <CheckCircle2 className="h-3 w-3 text-neon-cyan" />
+                        </div>
+                        <div className="p-3 rounded-xl bg-black/40 border border-white/5 font-mono text-[10px] text-neon-cyan/80 break-all">
+                          {daData?.eventId || "PENDING_SNAPSHOT_ANCHOR"}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <p className="text-[9px] font-black text-muted-foreground tracking-[0.2em] uppercase italic">Blob Root Hash</p>
+                          <Search className="h-3 w-3 text-neon-pink" />
+                        </div>
+                        <div className="p-3 rounded-xl bg-black/40 border border-white/5 font-mono text-[10px] text-neon-pink/80 break-all">
+                          {daData?.daBlobInfo?.blobRoot || "WAITING_FOR_DA_FINALIZATION..."}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 flex flex-col gap-3">
+                       <a 
+                        href={daData?.gatewayStatusUrl || "#"} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className={`flex items-center justify-center gap-2 w-full py-4 rounded-xl font-black text-[10px] tracking-[0.3em] uppercase italic transition-all ${
+                          daData?.eventId ? 'bg-white text-black hover:bg-neon-cyan' : 'bg-white/5 text-white/20 cursor-not-allowed'
+                        }`}
+                       >
+                         <ExternalLink className="h-4 w-4" />
+                         Verify on 0G Gateway
+                       </a>
+                       <p className="text-[8px] font-bold text-muted-foreground text-center uppercase tracking-widest">
+                         Every snapshot is cryptographically anchored and available via 0G Data Availability.
+                       </p>
+                    </div>
+                  </div>
+               </div>
+            </div>
           </div>
         </section>
       </main>

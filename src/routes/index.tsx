@@ -220,23 +220,20 @@ function Index() {
     fetchLeaderboard();
   }, []);
 
-  // Fetch marketplace assets only when authenticated
+  // Fetch marketplace assets for all users (public)
   useEffect(() => {
     const fetchMarketplace = async () => {
       const token = localStorage.getItem("hh_auth_token");
-      if (!authenticated || !token) {
-        setIsMarketplaceLoading(false);
-        return;
-      }
-
+      
       try {
         setIsMarketplaceLoading(true);
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
+        
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
         
         const response = await fetch(`${baseUrl}/marketplace/assets?pageSize=4`, {
-          headers: {
-            "Authorization": `Bearer ${token}`
-          }
+          headers
         });
         const data = await response.json();
         
