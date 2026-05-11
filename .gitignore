@@ -38,3 +38,4 @@ lerna-debug.log*
 pixel-perfect-page-main
 .env
 legacy-frontend-archive.zip
+.wrangler

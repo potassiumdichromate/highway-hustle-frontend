@@ -10,6 +10,14 @@ export default defineConfig({
     server: {
       port: 3000,
       strictPort: true,
-    }
+    },
+    build: {
+      rollupOptions: {
+        onwarn(warning, warn) {
+          if (warning.code === 'INVALID_ANNOTATION') return;
+          warn(warning);
+        },
+      },
+    },
   }
 });
