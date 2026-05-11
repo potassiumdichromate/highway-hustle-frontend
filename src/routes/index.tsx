@@ -218,13 +218,21 @@ function Index() {
       }
     };
     fetchLeaderboard();
+  }, []);
 
+  // Fetch marketplace assets only when authenticated
+  useEffect(() => {
     const fetchMarketplace = async () => {
+      const token = localStorage.getItem("hh_auth_token");
+      if (!authenticated || !token) {
+        setIsMarketplaceLoading(false);
+        return;
+      }
+
       try {
         setIsMarketplaceLoading(true);
         const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
-        const token = localStorage.getItem("hh_auth_token");
-
+        
         const response = await fetch(`${baseUrl}/marketplace/assets?pageSize=4`, {
           headers: {
             "Authorization": `Bearer ${token}`
@@ -277,8 +285,9 @@ function Index() {
         setIsMarketplaceLoading(false);
       }
     };
+
     fetchMarketplace();
-  }, []);
+  }, [authenticated]);
 
   const { activeWallet, sendPrivyTransaction, switchToZeroG, canUsePrivy, allowedChain } = usePrivyWalletTools();
 

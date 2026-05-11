@@ -229,8 +229,13 @@ function FullMarketplace() {
   };
 
   useEffect(() => {
-    fetchMarketplace();
-  }, []);
+    const token = localStorage.getItem("hh_auth_token");
+    if (privyAuthenticated && token) {
+      fetchMarketplace();
+    } else {
+      setIsLoading(false);
+    }
+  }, [privyAuthenticated]);
 
   useEffect(() => {
     if (items.length > 0 && activeWallet?.address) {
