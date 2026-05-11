@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Car, Zap, Gauge, Timer, ChevronRight, Loader2, ShieldCheck } from "lucide-react";
+import { 
+  ArrowLeft, Car, Zap, Gauge, Timer, ChevronRight, 
+  Loader2, ShieldCheck, ShoppingCart, Activity,
+  Shield, ExternalLink, Box, Database, Sparkles
+} from "lucide-react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { ethers } from "ethers";
 import { usePrivyWalletTools } from "@/hooks/usePrivyWalletTools";
 import logo from "@/assets/logo-flame.png";
+import ogLogo from "@/assets/og-logo.png";
+import NeuralBackground from "@/components/NeuralBackground";
 
 // Import images
 import cyberCoupe from "../assets/cars/coupe.png";
@@ -79,12 +85,28 @@ function FullMarketplace() {
   const [isEquipping, setIsEquipping] = useState<string | null>(null);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
 
-  const fetchMarketplace = async () => {
+  const fetchMarketplace = useCallback(async () => {
     try {
       setIsLoading(true);
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
-      const token = localStorage.getItem("hh_auth_token");
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
       
+      // Ensure we have a valid token for the current user
+      if (activeWallet?.address) {
+        const loginResponse = await fetch(`${baseUrl}/player/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            walletAddress: activeWallet.address,
+            privyMetaData: { address: activeWallet.address, type: "wallet" }
+          })
+        });
+        const loginResult = await loginResponse.json();
+        if (loginResult.success && loginResult.data?.token) {
+          localStorage.setItem("hh_auth_token", loginResult.data.token);
+        }
+      }
+
+      const token = localStorage.getItem("hh_auth_token");
       const response = await fetch(`${baseUrl}/marketplace/assets?pageSize=100`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -99,21 +121,20 @@ function FullMarketplace() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [activeWallet]);
 
-  const fetchPurchases = async () => {
-    if (!activeWallet?.address) {
-      setPurchasedItems([]);
+  const fetchPurchases = useCallback(async () => {
+    if (!activeWallet?.address || items.length === 0) {
+      if (activeWallet?.address) setPurchasedItems([]);
       return;
     }
     
     try {
       setIsGarageLoading(true);
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
       const identifier = activeWallet.address.toLowerCase();
-      
-      console.log("🔍 Fetching garage for:", identifier);
       const token = localStorage.getItem("hh_auth_token");
+      
       const response = await fetch(`${baseUrl}/marketplace/user/${identifier}/purchases`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -125,9 +146,7 @@ function FullMarketplace() {
         ownedIds = [...new Set([...ownedIds, ...result.purchases])];
       }
       
-      console.log("🚗 Owned Vehicle IDs:", ownedIds);
-      
-      // Critical fix: Ensure starter cars are treated as valid items even if not in the catalog
+      // Filter from catalog
       const ownedItems = items.filter(item => ownedIds.includes(item.id));
       
       // Manual injection for starter cars if missing from catalog
@@ -169,24 +188,10 @@ function FullMarketplace() {
       }
     } catch (error) {
       console.error("❌ Error fetching purchases:", error);
-      const freeItems = items.filter(item => item.id === "coupe");
-      if (freeItems.length === 0) {
-        freeItems.push({
-          id: "coupe",
-          name: "CYBER COUPE",
-          img: cyberCoupe,
-          price: "FREE",
-          priceOG: "0",
-          hash: "0x0",
-          stats: { speed: 85, accel: 90, handl: 78 },
-          color: "text-neon-pink"
-        });
-      }
-      setPurchasedItems(freeItems);
     } finally {
       setIsGarageLoading(false);
     }
-  };
+  }, [activeWallet?.address, items]);
 
   const handleEquip = async (asset: MarketplaceItem) => {
     if (!activeWallet?.address) return;
@@ -199,7 +204,7 @@ function FullMarketplace() {
 
     try {
       setIsEquipping(asset.id);
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
       const identifier = activeWallet.address.toLowerCase();
       const token = localStorage.getItem("hh_auth_token");
 
@@ -217,7 +222,7 @@ function FullMarketplace() {
       const result = await response.json();
       if (result.success) {
         setEquippedId(asset.id);
-        toast.success(`${asset.name} equipped!`);
+        toast.success(`${asset.name} equipped! Verified by 0G EVM.`);
       } else {
         throw new Error(result.error || "Failed to equip");
       }
@@ -235,13 +240,13 @@ function FullMarketplace() {
     } else {
       setIsLoading(false);
     }
-  }, [privyAuthenticated]);
+  }, [privyAuthenticated, fetchMarketplace]);
 
   useEffect(() => {
     if (items.length > 0 && activeWallet?.address) {
       fetchPurchases();
     }
-  }, [items, activeWallet?.address]);
+  }, [items, activeWallet?.address, fetchPurchases]);
 
   const mapBackendAssets = (assets: any[]) => {
     const imgMap: Record<string, any> = {
@@ -276,12 +281,8 @@ function FullMarketplace() {
       return;
     }
 
-    const marketplaceContract = import.meta.env.VITE_MARKETPLACE_CONTRACT_ADDRESS;
-    if (!marketplaceContract) {
-      toast.error("Marketplace contract not configured in environment.");
-      return;
-    }
-
+    const marketplaceContract = import.meta.env.VITE_MARKETPLACE_CONTRACT_ADDRESS || "0xB4a16C3BeA243b963dE6F8D5BFDaC38367a30D9f";
+    
     if (purchasingId) return;
     setPurchasingId(asset.id);
 
@@ -295,7 +296,7 @@ function FullMarketplace() {
       const iface = new ethers.Interface(PURCHASE_ABI);
       const data = iface.encodeFunctionData('purchaseAsset', [asset.hash, userIdentifier]);
 
-      toast.info(`Purchasing ${asset.name} for ${asset.price}...`);
+      toast.info(`Purchasing ${asset.name} via 0G EVM...`);
 
       // Step 3: Send via Privy Transaction logic
       const priceInWei = ethers.parseEther(asset.priceOG.replace(/[^0-9.]/g, ''));
@@ -314,10 +315,10 @@ function FullMarketplace() {
       );
 
       const txHash = typeof receipt === 'string' ? receipt : (receipt as any)?.transactionHash || (receipt as any)?.hash;
-      toast.success("Transaction sent! Confirming on 0G...");
+      toast.success("Transaction sent! Anchoring on 0G Chain...");
 
       // Step 4: Verify with Backend
-      const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
+      const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
       const verifyResponse = await fetch(`${baseUrl}/marketplace/purchase/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -331,160 +332,237 @@ function FullMarketplace() {
       const verifyResult = await verifyResponse.json();
 
       if (verifyResult.success) {
-        toast.success(`${asset.name} unlocked! Check your garage.`);
+        toast.success(`${asset.name} unlocked! Ownership recorded on 0G.`);
         fetchPurchases();
       } else {
-        toast.warning("Verification is pending. Your garage will update shortly.");
+        toast.warning("Verification is pending. Your ownership will be finalized soon.");
       }
     } catch (error: any) {
       console.error("❌ Purchase failed:", error);
-      toast.error(error.message || "Purchase failed. Please try again.");
+      toast.error(error.message || "Purchase failed. Check 0G balance.");
     } finally {
       setPurchasingId(null);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#020208] text-foreground font-sans selection:bg-primary/30">
-      {/* Background decoration */}
-      <div className="fixed inset-0 pointer-events-none opacity-20">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-[500px] bg-gradient-to-b from-neon-blue/20 to-transparent blur-[120px]" />
-      </div>
+    <div className="min-h-screen bg-[#050510] text-foreground font-sans selection:bg-primary/30 relative">
+      <NeuralBackground />
 
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b border-white/5 bg-background/80 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between px-6 py-4">
-          <Link to="/" className="flex items-center gap-3 transition hover:opacity-80">
-            <img src={logo} alt="Logo" className="h-10 w-auto" />
-            <span className="font-display text-xl font-black tracking-widest text-white uppercase">Highway Hustle</span>
-          </Link>
-          
-          <Link to="/" className="flex items-center gap-2 text-[10px] font-bold tracking-[0.3em] text-muted-foreground hover:text-white transition">
-            <ArrowLeft className="h-3 w-3" />
-            BACK TO HOME
-          </Link>
-        </div>
-      </header>
+      <div className="relative z-10 pb-20">
+        <header className="sticky top-0 z-50 border-b border-white/5 bg-[#050510]/60 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-[1400px] items-center justify-between px-6 py-4">
+            <Link to="/" className="flex items-center gap-3 transition hover:opacity-80">
+              <img src={logo} alt="Logo" className="h-10 w-auto" />
+              <span className="font-display text-xl font-black tracking-widest text-white uppercase italic">Highway Hustle</span>
+            </Link>
+            
+            <Link to="/" className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 font-display text-[10px] font-bold tracking-[0.2em] text-muted-foreground transition hover:border-neon-cyan hover:text-white hover:shadow-[0_0_15px_rgba(34,211,238,0.3)]">
+              <ArrowLeft className="h-3 w-3 transition-transform group-hover:-translate-x-1" />
+              BACK TO HOME
+            </Link>
+          </div>
+        </header>
 
-      <main className="mx-auto max-w-[1400px] px-6 py-20 relative z-10">
-        <div className="mb-16 text-center">
-          <h1 className="font-display text-6xl font-black tracking-[0.2em] text-gradient-chrome uppercase">Global Marketplace</h1>
-          <p className="mt-4 text-[10px] font-bold tracking-[0.5em] text-neon-cyan uppercase">Premium Vehicular Assets • On-Chain Verified on 0G Network</p>
-        </div>
-
-        {/* My Garage Section */}
-        {privyAuthenticated && (
-          <div className="mb-20">
-            <div className="mb-8 flex items-center justify-between border-b border-white/5 pb-4">
-              <h2 className="font-display text-2xl font-black tracking-widest text-white uppercase flex items-center gap-3">
-                <div className="h-2 w-2 rounded-full bg-neon-green animate-pulse" />
-                MY GARAGE
-              </h2>
-              <span className="text-[10px] font-bold tracking-[0.3em] text-muted-foreground uppercase">
-                {purchasedItems.length} VEHICLES OWNED
-              </span>
+        <main className="mx-auto max-w-[1400px] px-6 py-20 relative z-10">
+          <div className="mb-20 text-center">
+            <div className="inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-neon-cyan/10 ring-1 ring-neon-cyan/30 mb-8 animate-pulse">
+              <ShoppingCart className="h-8 w-8 text-neon-cyan" />
             </div>
-
-            {isGarageLoading ? (
-              <div className="flex py-10 justify-center">
-                <Loader2 className="h-8 w-8 animate-spin text-neon-green" />
+            <h1 className="font-display text-7xl font-black tracking-tight text-white uppercase italic mb-4">Global Marketplace</h1>
+            <div className="flex items-center justify-center gap-6">
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10">
+                <ShieldCheck className="h-3 w-3 text-neon-cyan" />
+                <span className="text-[10px] font-black tracking-[0.3em] text-muted-foreground uppercase italic">0G EVM VERIFIED</span>
               </div>
-            ) : purchasedItems.length > 0 ? (
-              <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {purchasedItems.map((car) => (
-                  <div key={`garage-${car.id}`} className="group relative rounded-2xl border border-neon-green/20 bg-neon-green/[0.02] p-2 transition hover:bg-neon-green/[0.05]">
-                    <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-[#0a0a1a]">
-                      <img src={car.img} alt={car.name} className="h-full w-full object-cover opacity-80" />
-                      <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent" />
-                      <div className="absolute top-3 right-3 rounded-md bg-neon-green px-2 py-1 text-[8px] font-black tracking-widest text-black uppercase shadow-[0_0_15px_rgba(52,211,153,0.5)]">
-                        OWNED
+              <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10">
+                <Database className="h-3 w-3 text-neon-pink" />
+                <span className="text-[10px] font-black tracking-[0.3em] text-muted-foreground uppercase italic">DA ANCHORED</span>
+              </div>
+            </div>
+          </div>
+
+          {/* My Garage Section */}
+          {privyAuthenticated && (
+            <div className="mb-24">
+              <div className="mb-10 flex items-center justify-between border-b border-white/5 pb-6">
+                <div className="flex items-center gap-4">
+                  <div className="h-10 w-10 rounded-xl bg-neon-green/10 border border-neon-green/30 flex items-center justify-center">
+                    <Car className="h-5 w-5 text-neon-green" />
+                  </div>
+                  <h2 className="font-display text-3xl font-black tracking-widest text-white uppercase italic">Private Garage</h2>
+                </div>
+                <div className="flex flex-col items-end">
+                   <span className="text-[10px] font-black tracking-[0.4em] text-muted-foreground uppercase">{purchasedItems.length} ASSETS COLLECTED</span>
+                   <div className="h-1 w-32 bg-white/5 rounded-full mt-2 overflow-hidden">
+                      <div className="h-full bg-neon-green" style={{ width: `${(purchasedItems.length / items.length) * 100}%` }} />
+                   </div>
+                </div>
+              </div>
+
+              {isGarageLoading ? (
+                <div className="flex py-20 justify-center">
+                  <Loader2 className="h-10 w-10 animate-spin text-neon-green" />
+                </div>
+              ) : purchasedItems.length > 0 ? (
+                <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                  {purchasedItems.map((car) => (
+                    <div key={`garage-${car.id}`} className="group relative rounded-3xl border border-white/5 bg-[#0a0a1a]/60 backdrop-blur-md p-4 transition hover:border-neon-green/30 hover:bg-[#0a0a1a] shadow-2xl">
+                      <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black">
+                        <img src={car.img} alt={car.name} className="h-full w-full object-cover opacity-60 group-hover:scale-105 transition duration-700" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1a] to-transparent" />
+                        <div className="absolute top-4 right-4 px-3 py-1 rounded-lg bg-neon-green text-[8px] font-black tracking-widest text-black uppercase italic shadow-[0_0_20px_rgba(34,197,94,0.4)]">
+                          DEPLOYMENT READY
+                        </div>
                       </div>
-                    </div>
-                    
-                    <div className="p-6">
-                      <div className="flex flex-col gap-2">
+                      
+                      <div className="mt-6 space-y-6">
+                        <div className="flex flex-col">
+                          <h3 className="font-display text-xl font-black text-white italic uppercase tracking-wider">{car.name}</h3>
+                          <div className="flex items-center gap-1.5 mt-1">
+                             <Activity className="h-2.5 w-2.5 text-neon-green" />
+                             <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Ownership Hash Verified</span>
+                          </div>
+                        </div>
+
                         <button 
                           onClick={() => handleEquip(car)}
                           disabled={equippedId === car.id || isEquipping === car.id}
-                          className={`flex h-10 w-full items-center justify-center gap-2 rounded-lg border font-bold tracking-[0.2em] text-[9px] transition-all duration-300 ${
+                          className={`group/btn relative flex h-12 w-full items-center justify-center gap-3 rounded-xl border font-black tracking-[0.3em] text-[10px] transition-all duration-500 uppercase italic overflow-hidden ${
                             equippedId === car.id 
-                              ? "border-neon-green/30 bg-neon-green/10 text-neon-green" 
-                              : "border-white/10 bg-white/5 text-white hover:bg-white/10 hover:border-white/20 active:scale-95"
+                              ? "border-neon-green/30 bg-neon-green/5 text-neon-green shadow-[inset_0_0_20px_rgba(34,197,94,0.1)]" 
+                              : "border-white/10 bg-white/5 text-white hover:border-white/30 hover:bg-white/10"
                           }`}
                         >
                           {isEquipping === car.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : equippedId === car.id ? (
                             <>
-                              <ShieldCheck className="h-4 w-4" />
-                              EQUIPPED
+                              <ShieldCheck className="h-4 w-4 text-neon-green" />
+                              ACTIVE DEPLOYMENT
                             </>
                           ) : (
-                            "EQUIP VEHICLE"
+                            <>
+                              <Zap className="h-4 w-4 group-hover/btn:animate-pulse" />
+                              EQUIP ASSET
+                            </>
                           )}
                         </button>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-white/5 bg-white/[0.01] py-10 text-center">
-                <p className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase italic">No vehicles in garage yet</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="mb-8 border-b border-white/5 pb-4">
-          <h2 className="font-display text-2xl font-black tracking-widest text-white uppercase">Marketplace Catalog</h2>
-        </div>
-
-        {isLoading ? (
-          <div className="flex min-h-[400px] items-center justify-center">
-            <div className="h-12 w-12 animate-spin rounded-full border-4 border-neon-cyan border-t-transparent shadow-neon-cyan" />
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {items.map((car) => (
-              <div key={car.id} className="group relative rounded-2xl border border-white/5 bg-white/[0.02] p-2 transition hover:bg-white/[0.05] hover:border-primary/30">
-                <div className="relative aspect-[4/3] overflow-hidden rounded-xl bg-[#0a0a1a]">
-                  <img src={car.img} alt={car.name} className="h-full w-full object-cover transition duration-700 group-hover:scale-110" />
-                  <div className="absolute inset-0 bg-gradient-to-t from-background/90 via-transparent to-transparent" />
-                  <div className="absolute bottom-3 left-3 rounded-md bg-background/80 px-2 py-1 backdrop-blur-md">
-                    <span className={`font-display text-xs font-bold ${car.color}`}>{car.price}</span>
-                  </div>
+                  ))}
                 </div>
-                
-                <div className="mt-4 p-4">
-                  <h3 className="font-display text-lg font-black tracking-tight text-white group-hover:text-primary transition uppercase">{car.name}</h3>
+              ) : (
+                <div className="rounded-3xl border border-white/5 bg-white/[0.02] py-24 text-center border-dashed backdrop-blur-md">
+                  <Car className="h-12 w-12 text-muted-foreground/20 mx-auto mb-4" />
+                  <p className="text-[10px] font-black tracking-[0.5em] text-muted-foreground uppercase italic">Your neural garage is empty</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="mb-12 flex items-center justify-between border-b border-white/5 pb-6">
+            <div className="flex items-center gap-4">
+               <div className="h-10 w-10 rounded-xl bg-neon-cyan/10 border border-neon-cyan/30 flex items-center justify-center">
+                 <Box className="h-5 w-5 text-neon-cyan" />
+               </div>
+               <h2 className="font-display text-3xl font-black tracking-widest text-white uppercase italic">Asset Catalog</h2>
+            </div>
+          </div>
+
+          {isLoading ? (
+            <div className="flex min-h-[400px] items-center justify-center">
+              <div className="h-16 w-16 animate-spin rounded-full border-4 border-neon-cyan border-t-transparent shadow-[0_0_30px_rgba(34,211,238,0.2)]" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {items.map((car) => (
+                <div key={car.id} className="group relative rounded-3xl border border-white/5 bg-[#0a0a1a]/60 backdrop-blur-md p-4 transition-all duration-500 hover:border-neon-cyan/40 hover:bg-[#0a0a1a] hover:-translate-y-2 shadow-2xl">
+                  <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black">
+                    <img src={car.img} alt={car.name} className="h-full w-full object-cover transition duration-1000 group-hover:scale-110 group-hover:opacity-100 opacity-60" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1a] to-transparent" />
+                    <div className="absolute bottom-4 left-4 rounded-xl bg-black/60 border border-white/10 px-3 py-1.5 backdrop-blur-xl shadow-2xl">
+                      <div className="flex items-center gap-2">
+                         <img src={ogLogo} alt="0G" className="h-3 w-auto" />
+                         <span className={`font-display text-sm font-black italic tracking-tighter ${car.color}`}>{car.price}</span>
+                      </div>
+                    </div>
+                  </div>
                   
-                  <div className="mt-6 space-y-4">
-                    <StatBar label="SPEED" value={car.stats.speed} color="bg-neon-pink" />
-                    <StatBar label="ACCEL" value={car.stats.accel} color="bg-neon-cyan" />
-                    <StatBar label="HANDLING" value={car.stats.handl} color="bg-neon-yellow" />
-                  </div>
+                  <div className="mt-6 p-2 space-y-8">
+                    <div className="flex flex-col">
+                      <h3 className="font-display text-2xl font-black text-white italic uppercase tracking-tighter group-hover:text-neon-cyan transition-colors">{car.name}</h3>
+                      <div className="flex items-center gap-2 mt-1 opacity-60">
+                         <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Protocol Series #00{CAR_ID_TO_INDEX[car.id]}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-5">
+                      <StatBar label="MAX VELOCITY" value={car.stats.speed} color="bg-neon-pink" />
+                      <StatBar label="ACCELERATION" value={car.stats.accel} color="bg-neon-cyan" />
+                      <StatBar label="STABILITY" value={car.stats.handl} color="bg-neon-yellow" />
+                    </div>
 
-                  <button 
-                    onClick={() => handleAcquire(car)}
-                    disabled={purchasingId === car.id}
-                    className="mt-8 w-full rounded-xl bg-primary/10 py-4 text-[10px] font-bold tracking-[0.3em] text-primary transition hover:bg-primary hover:text-white uppercase disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {purchasingId === car.id ? (
-                      <>
-                        <Loader2 className="h-3 w-3 animate-spin" />
-                        PROCESSING...
-                      </>
-                    ) : (
-                      "Purchase Asset"
-                    )}
-                  </button>
+                    <button 
+                      onClick={() => handleAcquire(car)}
+                      disabled={purchasingId === car.id}
+                      className="group/buy relative w-full rounded-xl bg-white text-black py-4 text-[10px] font-black tracking-[0.4em] transition-all duration-500 uppercase italic disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 overflow-hidden shadow-[0_0_30px_rgba(255,255,255,0.1)] hover:shadow-neon-cyan/40"
+                    >
+                      <div className="absolute inset-0 bg-neon-cyan translate-y-full group-hover/buy:translate-y-0 transition-transform duration-500" />
+                      <span className="relative z-10 flex items-center gap-2 group-hover/buy:text-black">
+                        {purchasingId === car.id ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            ANCHORING ASSET...
+                          </>
+                        ) : (
+                          <>
+                            <ExternalLink className="h-4 w-4" />
+                            ACQUIRE ASSET
+                          </>
+                        )}
+                      </span>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
+              ))}
+            </div>
+          )}
+        </main>
+
+        {/* Global Footer Stats */}
+        <div className="mx-auto max-w-6xl px-6 py-20 border-t border-white/5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+               <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-neon-cyan" />
+                    <h4 className="text-xs font-black tracking-[0.3em] text-white uppercase italic">Secure Ownership</h4>
+                  </div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase leading-relaxed tracking-wider opacity-60">
+                    EVERY ASSET PURCHASE IS VERIFIED BY THE 0G NETWORK SMART CONTRACTS, ENSURING PERMANENT, IMMUTABLE OWNERSHIP.
+                  </p>
+               </div>
+               <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Database className="h-5 w-5 text-neon-pink" />
+                    <h4 className="text-xs font-black tracking-[0.3em] text-white uppercase italic">Data Availability</h4>
+                  </div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase leading-relaxed tracking-wider opacity-60">
+                    VEHICLE METADATA AND PLAYER RECORDS ARE ANCHORED ON 0G DA TO GUARANTEE TRANSPARENCY AND FAIRNESS.
+                  </p>
+               </div>
+               <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Sparkles className="h-5 w-5 text-neon-yellow" />
+                    <h4 className="text-xs font-black tracking-[0.3em] text-white uppercase italic">Neural Sync</h4>
+                  </div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase leading-relaxed tracking-wider opacity-60">
+                    YOUR GARAGE IS CONSTANTLY SYNCED WITH THE 0G COMPUTE NETWORK FOR REAL-TIME DIAGNOSTICS AND INSIGHTS.
+                  </p>
+               </div>
+            </div>
+        </div>
+      </div>
 
       <CustomLoginModal 
         isOpen={showLoginModal} 
@@ -496,13 +574,13 @@ function FullMarketplace() {
 
 function StatBar({ label, value, color }: { label: string, value: number, color: string }) {
   return (
-    <div className="space-y-1.5">
-      <div className="flex justify-between text-[9px] font-bold tracking-widest text-muted-foreground uppercase">
+    <div className="space-y-2">
+      <div className="flex justify-between text-[9px] font-black tracking-[0.4em] text-muted-foreground uppercase italic">
         <span>{label}</span>
         <span className="text-white">{value}%</span>
       </div>
-      <div className="h-1 w-full overflow-hidden rounded-full bg-white/5">
-        <div className={`h-full ${color} transition-all duration-1000`} style={{ width: `${value}%` }} />
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/5 border border-white/5">
+        <div className={`h-full ${color} transition-all duration-1000 shadow-[0_0_10px_currentColor]`} style={{ width: `${value}%` }} />
       </div>
     </div>
   );

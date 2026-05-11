@@ -10,7 +10,7 @@ interface CustomLoginModalProps {
 
 export default function CustomLoginModal({ isOpen, onClose }: CustomLoginModalProps) {
   const { authenticated, login } = usePrivy();
-  const { loginWithOAuth } = useLoginWithOAuth();
+  const { initOAuth } = useLoginWithOAuth();
   const { sendCode, loginWithCode, state: emailState } = useLoginWithEmail();
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -62,7 +62,7 @@ export default function CustomLoginModal({ isOpen, onClose }: CustomLoginModalPr
 
   const handleGoogleLogin = () => {
     // Trigger Google OAuth directly
-    loginWithOAuth({ provider: "google" });
+    initOAuth({ provider: "google" });
   };
 
   return (
