@@ -1,18 +1,16 @@
+import { useEffect, useRef } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { PrivyProvider } from "@privy-io/react-auth";
+import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
 
 import {
   Outlet,
   Link,
   createRootRouteWithContext,
   useRouter,
-  HeadContent,
-  Scripts,
 } from "@tanstack/react-router";
 
-import appCss from "../styles.css?url";
-import logo from "../assets/logo-flame.png";
-
+import { Toaster } from "sonner";
+import AIAssistant from "@/components/AIAssistant";
 
 function NotFoundComponent() {
   return (
@@ -72,48 +70,65 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Highway Hustle" },
-      { name: "description", content: "Highway Hustle" },
-      { name: "author", content: "Highway Hustle" },
-      { property: "og:title", content: "Highway Hustle" },
-      { property: "og:description", content: "Highway Hustle" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@HighwayHustle" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-    ],
-  }),
-  shellComponent: RootShell,
+  // No shellComponent — this is a CSR app (vite dev / createRoot).
+  // shellComponent renders <html> inside React which lands inside <div#root>
+  // and causes the "html cannot be a child of div" hydration crash.
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
   errorComponent: ErrorComponent,
 });
 
-function RootShell({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en">
-      <head>
-        <HeadContent />
-      </head>
-      <body>
-        {children}
-        <Scripts />
-      </body>
-    </html>
-  );
-}
+// Calls backend /player/login once after Privy auth so hh_auth_token is always set
+function AuthSync() {
+  const { authenticated, user } = usePrivy();
+  const { wallets } = useWallets();
+  const attempted = useRef(false);
 
-import { Toaster } from "sonner";
-import AIAssistant from "@/components/AIAssistant";
+  useEffect(() => {
+    if (!authenticated) {
+      attempted.current = false;
+      return;
+    }
+    if (attempted.current) return;
+
+    const wallet =
+      wallets.find((w) => w.address) ??
+      (user?.wallet?.address ? user.wallet : null) ??
+      ((user?.embeddedWallets as any)?.[0]?.address
+        ? (user?.embeddedWallets as any)[0]
+        : null);
+
+    if (!wallet?.address) return;
+    attempted.current = true;
+
+    const baseUrl =
+      import.meta.env.VITE_API_BASE_URL ||
+      "https://highway-hustle-backend.onrender.com/api";
+
+    fetch(`${baseUrl}/player/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        walletAddress: wallet.address,
+        privyMetaData: {
+          address: wallet.address,
+          type: (wallet as any).connectorType ?? "embedded",
+        },
+      }),
+    })
+      .then((r) => r.json())
+      .then((result) => {
+        if (result.success && result.data?.token) {
+          localStorage.setItem("hh_auth_token", result.data.token);
+          localStorage.setItem("walletAddress", wallet.address!.toLowerCase());
+          window.dispatchEvent(new Event("hh-session-changed"));
+        }
+      })
+      .catch(() => {});
+  }, [authenticated, wallets, user]);
+
+  return null;
+}
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
@@ -122,73 +137,33 @@ function RootComponent() {
     <PrivyProvider
       appId={import.meta.env.VITE_PRIVY_APP_ID || "cmhfx1cl20001l10d4l0w8u4j"}
       config={{
-        loginMethods: ["email", "wallet", "google", "discord"],
+        loginMethods: ["email", "wallet", "google"],
         appearance: {
           theme: "dark",
           accentColor: "#f43f5e",
           showWalletLoginFirst: false,
-          logo: (
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              width: '100%',
-              padding: '20px',
-              borderRadius: '16px',
-              background: 'linear-gradient(135deg, #110c1d 0%, #251635 100%)',
-              border: '1px solid rgba(244, 63, 94, 0.3)',
-              marginBottom: '10px'
-            }}>
-              <img src={logo} alt="Highway Hustle" style={{ height: '90px', width: 'auto', marginBottom: '15px' }} />
-              <div style={{ 
-                fontFamily: 'Orbitron, sans-serif', 
-                fontWeight: 900, 
-                fontSize: '20px', 
-                letterSpacing: '3px',
-                color: '#f43f5e',
-                textShadow: '0 0 15px rgba(244, 63, 94, 0.8)',
-                textAlign: 'center',
-                textTransform: 'uppercase'
-              }}>
-                HIGHWAY HUSTLE
-              </div>
-            </div>
-          ),
         },
         supportedChains: [{
           id: 16661,
-          name: '0G Mainnet',
-          network: '0g-mainnet',
-          nativeCurrency: {
-            name: '0G',
-            symbol: '0G',
-            decimals: 18,
-          },
+          name: "0G Mainnet",
+          network: "0g-mainnet",
+          nativeCurrency: { name: "0G", symbol: "0G", decimals: 18 },
           rpcUrls: {
-            default: {
-              http: ['https://evmrpc.0g.ai'],
-            },
-            public: {
-              http: ['https://evmrpc.0g.ai'],
-            },
+            default: { http: ["https://evmrpc.0g.ai"] },
+            public: { http: ["https://evmrpc.0g.ai"] },
           },
           blockExplorers: {
-            default: {
-              name: '0G Scan',
-              url: 'https://chainscan.0g.ai',
-            },
+            default: { name: "0G Scan", url: "https://chainscan.0g.ai" },
           },
           testnet: false,
         }],
         embeddedWallets: {
-          ethereum: {
-            createOnLogin: "users-without-wallets",
-          }
+          ethereum: { createOnLogin: "users-without-wallets" },
         },
       }}
     >
       <QueryClientProvider client={queryClient}>
+        <AuthSync />
         <Outlet />
         <AIAssistant />
         <Toaster position="top-right" theme="dark" richColors />

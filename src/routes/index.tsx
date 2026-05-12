@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { toast } from "sonner";
 import { ethers } from "ethers";
@@ -18,7 +18,7 @@ import ogPlatform from "@/assets/og-platform.jpg";
 import helmet from "@/assets/helmet.jpg";
 import ogLogo from "@/assets/og-logo.png";
 import SpeedFX from "@/components/SpeedFX";
-import { usePrivyWalletTools } from "../hooks/usePrivyWalletTools";
+import { getPrimaryPrivyWallet, usePrivyWalletTools } from "../hooks/usePrivyWalletTools";
 import cyberCoupe from "../assets/cars/coupe.png";
 import hyperDrift from "../assets/cars/f1.png";
 import stealthInterceptor from "../assets/cars/ctr.png";
@@ -29,7 +29,7 @@ import suvImg from "../assets/cars/suv.png";
 import muscleImg from "../assets/cars/muscle.png";
 import pickupImg from "../assets/cars/pickup.png";
 import NeuralBackground from "@/components/NeuralBackground";
-import CustomLoginModal from "@/components/CustomLoginModal";
+import LoginModal from "@/components/LoginModal";
 import trailerVideo from "@/assets/HH-LIVE.mp4";
 
 export const Route = createFileRoute("/")({
@@ -187,6 +187,7 @@ function Index() {
   const { login, authenticated, logout, user } = usePrivy();
   const navigate = useNavigate();
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const closeLoginModal = useCallback(() => setShowLoginModal(false), []);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardPlayer[]>([]);
   const [marketplaceItems, setMarketplaceItems] = useState<MarketplaceItem[]>([]);
@@ -198,6 +199,10 @@ function Index() {
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
   const [showTrailer, setShowTrailer] = useState(false);
 
+  useEffect(() => {
+    if (authenticated) closeLoginModal();
+  }, [authenticated, closeLoginModal]);
+
   // ✅ DIAGNOSTIC: Log on every render to track auth state
 
   // Fetch real leaderboard data
@@ -205,7 +210,7 @@ function Index() {
     const fetchLeaderboard = async () => {
       try {
         setIsLeaderboardLoading(true);
-        const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
+        const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
         const response = await fetch(`${baseUrl}/leaderboard?t=${Date.now()}`);
         const data = await response.json();
         if (data.success && Array.isArray(data.leaderboard)) {
@@ -372,7 +377,7 @@ function Index() {
     if (authenticated && user) {
       const recordLogin = async () => {
         try {
-          const baseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:4500/api";
+          const baseUrl = import.meta.env.VITE_API_BASE_URL || "https://highway-hustle-backend.onrender.com/api";
           
           // Improved identifier resolution
           const walletAddr = user.wallet?.address || user.linkedAccounts?.find(a => a.type === 'wallet')?.address;
@@ -420,7 +425,7 @@ function Index() {
       return;
     }
 
-    const walletAddress = user?.wallet?.address;
+    const walletAddress = getPrimaryPrivyWallet(user, wallets)?.address;
     if (!walletAddress) {
       setShowLoginModal(true);
       return;
@@ -953,11 +958,9 @@ function Index() {
         onClose={() => setIsModeModalOpen(false)} 
       />
 
-      {/* Custom Login Modal */}
-      <CustomLoginModal 
-        isOpen={showLoginModal} 
-        onClose={() => setShowLoginModal(false)} 
-      />
+      {showLoginModal ? (
+        <LoginModal open onClose={closeLoginModal} />
+      ) : null}
       </div>
     </div>
   );
@@ -965,10 +968,10 @@ function Index() {
 
 // Mobile-optimized cinematic game mode modal
 function GameModeModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  if (!isOpen) return null;
-
   const { user } = usePrivy();
   const walletAddress = user?.wallet?.address;
+
+  if (!isOpen) return null;
 
   const handleModeClick = (url: string) => {
     if (walletAddress && url) {

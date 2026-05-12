@@ -83,11 +83,13 @@ export default function SpeedFX() {
     window.addEventListener("resize", onResize);
 
     let raf = 0;
-    const clock = new THREE.Clock();
+    let lastTime = performance.now();
     const pos = geom.getAttribute("position") as THREE.BufferAttribute;
 
     const animate = () => {
-      const dt = clock.getDelta();
+      const now = performance.now();
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
       for (let i = 0; i < COUNT; i++) {
         const dz = speeds[i] * dt * 28;
         positions[i * 6 + 2] += dz;

@@ -69,14 +69,15 @@ interface MarketplaceItem {
   color: string;
 }
 
-import CustomLoginModal from "@/components/CustomLoginModal";
+import LoginModal from "@/components/LoginModal";
 
 function FullMarketplace() {
-  const { login } = usePrivy();
+  const { login, authenticated } = usePrivy();
   const navigate = useNavigate();
   const { activeWallet, sendPrivyTransaction, switchToZeroG, canUsePrivy, allowedChain, privyAuthenticated } = usePrivyWalletTools();
   
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const closeLoginModal = useCallback(() => setShowLoginModal(false), []);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<MarketplaceItem[]>([]);
   const [equippedId, setEquippedId] = useState<string>("coupe");
@@ -84,6 +85,10 @@ function FullMarketplace() {
   const [isGarageLoading, setIsGarageLoading] = useState(false);
   const [isEquipping, setIsEquipping] = useState<string | null>(null);
   const [purchasingId, setPurchasingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (authenticated) closeLoginModal();
+  }, [authenticated, closeLoginModal]);
 
   const fetchMarketplace = useCallback(async () => {
     try {
@@ -234,8 +239,7 @@ function FullMarketplace() {
   };
 
   useEffect(() => {
-    const token = localStorage.getItem("hh_auth_token");
-    if (privyAuthenticated && token) {
+    if (privyAuthenticated) {
       fetchMarketplace();
     } else {
       setIsLoading(false);
@@ -564,10 +568,9 @@ function FullMarketplace() {
         </div>
       </div>
 
-      <CustomLoginModal 
-        isOpen={showLoginModal} 
-        onClose={() => setShowLoginModal(false)} 
-      />
+      {showLoginModal ? (
+        <LoginModal open onClose={closeLoginModal} />
+      ) : null}
     </div>
   );
 }
