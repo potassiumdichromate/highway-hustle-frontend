@@ -715,20 +715,13 @@ function Index() {
               <p className="mt-2 text-muted-foreground uppercase tracking-[0.2em] text-xs">EXOTIC PERFORMANCE. VERIFIED OWNERSHIP.</p>
             </div>
             {authenticated ? (
-              <Link 
+              <Link
                 to="/marketplace"
                 className="group flex items-center gap-2 font-display text-xs font-bold tracking-widest text-foreground hover:text-neon-pink transition"
               >
                 BROWSE ALL <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
               </Link>
-            ) : (
-              <button 
-                onClick={() => setShowLoginModal(true)}
-                className="group flex items-center gap-2 font-display text-xs font-bold tracking-widest text-muted-foreground hover:text-neon-pink transition cursor-pointer"
-              >
-                BROWSE ALL <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition" />
-              </button>
-            )}
+            ) : null}
           </div>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4 min-h-[400px] relative">
