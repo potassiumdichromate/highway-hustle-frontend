@@ -242,6 +242,8 @@ function ProfilePage() {
             <div className="flex items-center gap-6">
               <button 
                 onClick={() => {
+                  localStorage.removeItem("walletAddress");
+                  localStorage.removeItem("hh_auth_token");
                   logout();
                   navigate({ to: "/" });
                 }}

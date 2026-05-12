@@ -374,7 +374,7 @@ export default function LoginModal({ open, onClose }: LoginModalProps) {
               <p className="hh-login-subtitle">Email, Google, or connect a wallet.</p>
             </div>
 
-            {existingAddress && (
+            {authenticated && existingAddress && (
               <div className="hh-login-badge">
                 Wallet: <span className="hh-login-badge-address">{existingAddress}</span>
               </div>
