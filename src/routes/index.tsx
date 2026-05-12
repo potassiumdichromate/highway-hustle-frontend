@@ -432,7 +432,14 @@ function Index() {
     }
 
     if (mode.gameUrl) {
-      window.location.href = `${mode.gameUrl}?wallet=${walletAddress}`;
+      navigate({
+        to: "/game",
+        search: {
+          mode: mode.id,
+          buildUrl: mode.gameUrl,
+          wallet: walletAddress,
+        },
+      });
     }
   };
 
@@ -969,13 +976,23 @@ function Index() {
 // Mobile-optimized cinematic game mode modal
 function GameModeModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { user } = usePrivy();
-  const walletAddress = user?.wallet?.address;
+  const { wallets } = useWallets();
+  const navigate = useNavigate();
+  const walletAddress = getPrimaryPrivyWallet(user, wallets)?.address;
 
   if (!isOpen) return null;
 
-  const handleModeClick = (url: string) => {
-    if (walletAddress && url) {
-      window.location.href = `${url}?wallet=${walletAddress}`;
+  const handleModeClick = (mode: GameMode) => {
+    if (walletAddress && mode.gameUrl) {
+      navigate({
+        to: "/game",
+        search: {
+          mode: mode.id,
+          buildUrl: mode.gameUrl,
+          wallet: walletAddress,
+        },
+      });
+      onClose();
     }
   };
 
@@ -1014,7 +1031,7 @@ function GameModeModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
                 return (
                   <div
                     key={m.id}
-                    onClick={() => handleModeClick(m.gameUrl)}
+                    onClick={() => handleModeClick(m)}
                     className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-card/40 transition hover:scale-[1.02] hover:border-primary/50"
                   >
                     <div className="relative aspect-[3/4] overflow-hidden">
