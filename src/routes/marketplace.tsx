@@ -80,6 +80,7 @@ function FullMarketplace() {
   const closeLoginModal = useCallback(() => setShowLoginModal(false), []);
   const [items, setItems] = useState<MarketplaceItem[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<MarketplaceItem[]>([]);
+  const [rewardIds, setRewardIds] = useState<string[]>([]);
   const [equippedId, setEquippedId] = useState<string>("coupe");
   const [isLoading, setIsLoading] = useState(true);
   const [isGarageLoading, setIsGarageLoading] = useState(false);
@@ -146,9 +147,22 @@ function FullMarketplace() {
       const result = await response.json();
       
       let ownedIds = ["coupe", "pickup"]; // Always start with free cars
-      
+
       if (result.success && Array.isArray(result.purchases)) {
         ownedIds = [...new Set([...ownedIds, ...result.purchases])];
+      }
+
+      // Fetch rewards and merge into garage
+      const rewardsResponse = await fetch(`${baseUrl}/player/rewards?user=${identifier}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const rewardsResult = await rewardsResponse.json();
+      let claimedRewardIds: string[] = [];
+      if (rewardsResult.success && Array.isArray(rewardsResult.rewards) && rewardsResult.rewards.length > 0) {
+        claimedRewardIds = rewardsResult.rewards.map((r: any) => r.rewardId);
+        setRewardIds(claimedRewardIds);
+        ownedIds = [...new Set([...ownedIds, ...claimedRewardIds])];
+        toast.success(`🎁 You have ${claimedRewardIds.length} reward${claimedRewardIds.length > 1 ? "s" : ""}! Check your garage.`);
       }
       
       // Filter from catalog
@@ -415,9 +429,15 @@ function FullMarketplace() {
                       <div className="relative aspect-[16/10] overflow-hidden rounded-2xl bg-black">
                         <img src={car.img} alt={car.name} className="h-full w-full object-cover opacity-60 group-hover:scale-105 transition duration-700" />
                         <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a1a] to-transparent" />
-                        <div className="absolute top-4 right-4 px-3 py-1 rounded-lg bg-neon-green text-[8px] font-black tracking-widest text-black uppercase italic shadow-[0_0_20px_rgba(34,197,94,0.4)]">
-                          DEPLOYMENT READY
-                        </div>
+                        {rewardIds.includes(car.id) ? (
+                          <div className="absolute top-4 right-4 px-3 py-1 rounded-lg bg-neon-yellow text-[8px] font-black tracking-widest text-black uppercase italic shadow-[0_0_20px_rgba(234,179,8,0.5)]">
+                            🎁 REWARD
+                          </div>
+                        ) : (
+                          <div className="absolute top-4 right-4 px-3 py-1 rounded-lg bg-neon-green text-[8px] font-black tracking-widest text-black uppercase italic shadow-[0_0_20px_rgba(34,197,94,0.4)]">
+                            DEPLOYMENT READY
+                          </div>
+                        )}
                       </div>
                       
                       <div className="mt-6 space-y-6">

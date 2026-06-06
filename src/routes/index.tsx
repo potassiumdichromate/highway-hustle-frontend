@@ -411,6 +411,9 @@ function Index() {
             localStorage.setItem("hh_auth_token", loginResult.data.token);
           }
 
+          // Session contract tx is recorded on backend during login.
+          // Full gameplay contract sync runs on profile load and when exiting the game.
+
         } catch (err) {
           console.error("❌ Error recording login:", err);
         }
