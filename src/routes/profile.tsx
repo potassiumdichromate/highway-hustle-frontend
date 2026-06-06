@@ -6,7 +6,7 @@ import {
   Trophy, Gauge, Timer, Zap, Edit2, 
   Dna, Cpu, Brain, Search, Car, 
   Activity, CircleDot, ChevronRight, Loader2,
-  ExternalLink, CheckCircle2
+  ExternalLink, CheckCircle2, Copy, Check
 } from "lucide-react";
 import logo from "@/assets/logo-flame.png";
 import ogLogo from "@/assets/og-logo.png";
@@ -63,6 +63,14 @@ function ProfilePage() {
   const [playerData, setPlayerData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const copyAddress = () => {
+    if (!identifier) return;
+    navigator.clipboard.writeText(identifier);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   const [tempName, setTempName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
@@ -321,6 +329,21 @@ function ProfilePage() {
                   <span className="text-[10px] font-black tracking-widest text-muted-foreground uppercase">Verified on 0G Network</span>
                 </div>
               </div>
+              {identifier && (
+                <button
+                  onClick={copyAddress}
+                  className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 transition hover:border-neon-cyan/40 hover:bg-white/10 group w-fit"
+                >
+                  <Wallet className="h-3 w-3 text-muted-foreground group-hover:text-neon-cyan transition" />
+                  <span className="font-mono text-[10px] tracking-wider text-muted-foreground group-hover:text-white transition">
+                    {identifier.slice(0, 6)}...{identifier.slice(-4)}
+                  </span>
+                  {copied
+                    ? <Check className="h-3 w-3 text-neon-cyan" />
+                    : <Copy className="h-3 w-3 text-muted-foreground group-hover:text-neon-cyan transition" />
+                  }
+                </button>
+              )}
             </div>
 
             <div className="rounded-xl border border-white/5 bg-white/[0.05] p-4 text-center min-w-[120px] backdrop-blur-sm">
